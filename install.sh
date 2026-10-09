@@ -40,9 +40,13 @@ fi
 # Activate virtual environment
 source .venv/bin/activate
 
-echo -e "\n${CYAN}[3/4] Installing Python requirements...${NC}"
+echo -e "\n${CYAN}[3/4] Installing Python requirements and preparing data directory...${NC}"
 pip install --upgrade pip
 pip install -r requirements.txt
+
+# Ensure data directory exists with full write permissions for SQLite
+mkdir -p data
+chmod -R 777 data
 
 # Run interactive configuration wizard
 echo -e "\n${CYAN}[4/4] Launching Interactive Setup Wizard...${NC}"

@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   goguard-bot:
     build:
@@ -11,15 +9,10 @@ services:
       - .env
     volumes:
       - ./data:/app/data
-      # Mount SQLite db directory for persistence
-      - bot_data:/app
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///data/bot.db
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/bot.db
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  bot_data:

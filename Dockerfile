@@ -25,12 +25,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY pyproject.toml .
 
-# Create non-privileged user for security
-RUN useradd -m -u 1000 botuser && \
-    mkdir -p /app/data && \
-    chown -R botuser:botuser /app
-
-USER botuser
+# Ensure data directory exists with write permissions
+RUN mkdir -p /app/data && chmod -R 777 /app/data
 
 # Run Telegram Bot
 CMD ["python", "-m", "app.main"]

@@ -572,6 +572,9 @@ DEBUG=false
     if choice == "1":
         docker_ready, compose_cmd = ensure_docker_and_compose()
         if docker_ready and compose_cmd:
+            os.makedirs("data", exist_ok=True)
+            if sys.platform.startswith("linux"):
+                os.system("chmod -R 777 data >/dev/null 2>&1")
             print(f"\n{CYAN}Starting containers with {BOLD}{compose_cmd} up -d --build{RESET}...{RESET}")
             ret = os.system(f"{compose_cmd} up -d --build")
             if ret == 0:
