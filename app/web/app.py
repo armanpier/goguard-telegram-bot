@@ -15,7 +15,13 @@ from app.database.models import User, Plan, Subscription, PaymentReceipt
 from app.services.goguard import GoGuardClient
 from app.services.payment import process_receipt_approval, process_receipt_rejection
 from app.services.subscription import sync_subscription_details
-from app.services.settings_service import get_all_settings, update_settings
+from app.services.settings_service import (
+    get_all_settings,
+    update_settings,
+    get_web_credentials,
+    is_default_password,
+    set_web_password,
+)
 from app.bot.utils.formatters import format_price, format_timestamp, bytes_to_human
 
 from pathlib import Path
@@ -65,6 +71,17 @@ async def require_auth(request: Request) -> str:
             status_code=status.HTTP_307_TEMPORARY_REDIRECT,
             headers={"Location": "/login"}
         )
+
+    # Force password change if currently default 'admin'
+    path = request.url.path
+    if path not in ("/change-password", "/logout"):
+        async with async_session_factory() as session:
+            if await is_default_password(session):
+                raise HTTPException(
+                    status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+                    headers={"Location": "/change-password?required=1"}
+                )
+
     return username
 
 
@@ -98,9 +115,14 @@ def create_web_app(bot: Bot, goguard: GoGuardClient) -> FastAPI:
         username: str = Form(...),
         password: str = Form(...),
     ):
-        if username == settings.WEB_USERNAME and password == settings.WEB_PASSWORD:
+        async with async_session_factory() as session:
+            valid_user, valid_pass = await get_web_credentials(session)
+
+        if username == valid_user and password == valid_pass:
             token = create_session_token(username)
-            resp = RedirectResponse(url="/", status_code=303)
+            # If password is still default 'admin', redirect to change password
+            target_url = "/change-password?required=1" if password == "admin" else "/"
+            resp = RedirectResponse(url=target_url, status_code=303)
             resp.set_cookie(
                 key="admin_session",
                 value=token,
@@ -124,12 +146,81 @@ def create_web_app(bot: Bot, goguard: GoGuardClient) -> FastAPI:
         return resp
 
     # =========================================================================
+    # Password Change Routes (Security Enforcement)
+    # =========================================================================
+
+    @app.get("/change-password", response_class=HTMLResponse)
+    async def change_password_page(
+        request: Request,
+        required: Optional[int] = None,
+        msg: str = "",
+        user: str = Depends(require_auth),
+    ):
+        async with async_session_factory() as session:
+            is_def = await is_default_password(session)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="change_password.html",
+            context={
+                "active_page": "change_password",
+                "current_user": user,
+                "required": bool(required) or is_def,
+                "error": None,
+                "message": msg,
+            },
+        )
+
+    @app.post("/change-password", response_class=HTMLResponse)
+    async def change_password_submit(
+        request: Request,
+        current_password: str = Form(...),
+        new_password: str = Form(...),
+        confirm_password: str = Form(...),
+        user: str = Depends(require_auth),
+    ):
+        async with async_session_factory() as session:
+            valid_user, valid_pass = await get_web_credentials(session)
+            is_def = await is_default_password(session)
+
+            error = None
+            if current_password != valid_pass:
+                error = "رمز عبور فعلی نادرست است."
+            elif new_password.strip() == "admin":
+                error = "رمز عبور جدید نمی‌تواند کلمه پیش‌فرض (admin) باشد."
+            elif len(new_password.strip()) < 5:
+                error = "رمز عبور جدید باید حداقل ۵ کاراکتر باشد."
+            elif new_password != confirm_password:
+                error = "رمز عبور جدید با تکرار آن مطابقت ندارد."
+
+            if error:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="change_password.html",
+                    context={
+                        "active_page": "change_password",
+                        "current_user": user,
+                        "required": is_def,
+                        "error": error,
+                        "message": "",
+                    },
+                    status_code=400,
+                )
+
+            await set_web_password(session, new_password.strip())
+
+        return RedirectResponse(
+            url="/dashboard?msg=رمز عبور با موفقیت به‌روزرسانی شد و امنیت پنل ارتقا یافت.",
+            status_code=303,
+        )
+
+    # =========================================================================
     # Dashboard Route
     # =========================================================================
 
     @app.get("/", response_class=HTMLResponse)
     @app.get("/dashboard", response_class=HTMLResponse)
-    async def dashboard(request: Request, user: str = Depends(require_auth)):
+    async def dashboard(request: Request, msg: str = "", user: str = Depends(require_auth)):
         async with async_session_factory() as session:
             total_users = (await session.execute(select(func.count(User.id)))).scalar() or 0
             active_subs = (await session.execute(
@@ -168,6 +259,7 @@ def create_web_app(bot: Bot, goguard: GoGuardClient) -> FastAPI:
                 "goguard_ok": goguard_ok,
                 "goguard_url": settings.GOGUARD_BASE_URL,
                 "goguard_user": settings.GOGUARD_USERNAME,
+                "message": msg,
             },
         )
 

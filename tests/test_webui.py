@@ -1,8 +1,15 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from app.config import settings
 from app.web.app import create_web_app, create_session_token, verify_session_token
+from app.database.session import async_session_factory, init_db
+from app.services.settings_service import set_web_password
+
+
+@pytest.fixture(autouse=True)
+async def setup_test_db():
+    await init_db()
 
 
 def test_session_token_signing():
@@ -37,11 +44,15 @@ async def test_webui_auth_redirect():
 
 
 @pytest.mark.asyncio
-async def test_webui_login_flow():
+async def test_webui_login_and_force_password_change():
     mock_bot = AsyncMock()
     mock_goguard = AsyncMock()
     app = create_web_app(mock_bot, mock_goguard)
     
+    # Ensure default password is set to 'admin'
+    async with async_session_factory() as session:
+        await set_web_password(session, "admin")
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # 1. Invalid credentials
@@ -52,11 +63,56 @@ async def test_webui_login_flow():
         )
         assert "نام کاربری یا رمز عبور اشتباه است" in resp.text
 
-        # 2. Valid credentials
+        # 2. Valid initial login with admin:admin
         resp = await client.post(
             "/login",
-            data={"username": settings.WEB_USERNAME, "password": settings.WEB_PASSWORD},
+            data={"username": "admin", "password": "admin"},
             follow_redirects=False,
         )
         assert resp.status_code in (302, 303)
         assert "admin_session" in resp.cookies
+        # Should redirect to change-password because password is default 'admin'
+        assert "/change-password" in resp.headers.get("location", "")
+
+        # 3. Accessing /dashboard while password is still 'admin' forces redirect to /change-password
+        client.cookies.set("admin_session", resp.cookies.get("admin_session"))
+        resp2 = await client.get("/", follow_redirects=False)
+        assert resp2.status_code in (302, 303, 307)
+        assert "/change-password" in resp2.headers.get("location", "")
+
+        # 4. Attempt to change password to 'admin' again (rejected)
+        resp_same = await client.post(
+            "/change-password",
+            data={"current_password": "admin", "new_password": "admin", "confirm_password": "admin"},
+        )
+        assert resp_same.status_code == 400
+        assert "رمز عبور جدید نمی‌تواند کلمه پیش‌فرض" in resp_same.text
+
+        # 5. Successfully change password to strong password
+        resp_change = await client.post(
+            "/change-password",
+            data={
+                "current_password": "admin",
+                "new_password": "SuperSecretPass2026",
+                "confirm_password": "SuperSecretPass2026",
+            },
+            follow_redirects=False,
+        )
+        assert resp_change.status_code in (302, 303)
+        assert "/dashboard" in resp_change.headers.get("location", "")
+
+        # 6. Now accessing /dashboard succeeds (200 OK)
+        resp_dashboard = await client.get("/dashboard", follow_redirects=True)
+        assert resp_dashboard.status_code == 200
+        assert "داشبورد و آمار سیستم" in resp_dashboard.text
+
+        # 7. Old password 'admin' no longer works
+        resp_old = await client.post(
+            "/login",
+            data={"username": "admin", "password": "admin"},
+        )
+        assert "نام کاربری یا رمز عبور اشتباه است" in resp_old.text
+
+        # 8. Reset back to admin for standard test isolation
+        async with async_session_factory() as session:
+            await set_web_password(session, "admin")

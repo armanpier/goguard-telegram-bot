@@ -20,6 +20,28 @@ if [ "$EUID" -ne 0 ]; then
   echo -e "${YELLOW}Warning: Running without root privileges. Some package installations may fail.${NC}"
 fi
 
+# Locate or clone project directory
+INSTALL_DIR="$HOME/goguard-telegram-bot"
+REPO_URL="https://github.com/armanpier/goguard-telegram-bot.git"
+
+if [ ! -f "setup.py" ]; then
+    if [ -d "$INSTALL_DIR" ]; then
+        echo -e "${YELLOW}ℹ️ Existing installation found at $INSTALL_DIR. Navigating...${NC}"
+        cd "$INSTALL_DIR"
+    else
+        echo -e "${CYAN}📥 Cloning GoGuard Telegram Bot into $INSTALL_DIR...${NC}"
+        git clone "$REPO_URL" "$INSTALL_DIR"
+        cd "$INSTALL_DIR"
+    fi
+fi
+
+# Pull latest commits if inside git worktree
+if [ -d ".git" ]; then
+    echo -e "${CYAN}🔄 Syncing latest updates from GitHub...${NC}"
+    git stash >/dev/null 2>&1 || true
+    git pull origin main || true
+fi
+
 # Detect package manager and install requirements
 echo -e "\n${CYAN}[1/4] Checking system dependencies (Python 3.11+, Git, Curl)...${NC}"
 if command -v apt-get >/dev/null 2>&1; then

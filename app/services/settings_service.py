@@ -23,6 +23,8 @@ CONFIGURABLE_KEYS = [
     "GOGUARD_USERNAME",
     "GOGUARD_PASSWORD",
     "GOGUARD_SUB_URL_TEMPLATE",
+    "WEB_USERNAME",
+    "WEB_PASSWORD",
 ]
 
 
@@ -73,6 +75,25 @@ async def get_setting(session: AsyncSession, key: str, default: Any = None) -> A
 async def set_setting(session: AsyncSession, key: str, value: Any) -> None:
     """Set or update a single setting."""
     await update_settings(session, {key: value})
+
+
+async def get_web_credentials(session: AsyncSession) -> tuple[str, str]:
+    """Retrieve current WebUI username and password from DB or config fallback."""
+    username = await get_setting(session, "WEB_USERNAME", default=settings.WEB_USERNAME)
+    password = await get_setting(session, "WEB_PASSWORD", default=settings.WEB_PASSWORD)
+    return str(username or "admin"), str(password or "admin")
+
+
+async def is_default_password(session: AsyncSession) -> bool:
+    """Check if the current admin password is still the default 'admin'."""
+    _, password = await get_web_credentials(session)
+    return password == "admin"
+
+
+async def set_web_password(session: AsyncSession, new_password: str) -> None:
+    """Set new WebUI admin password in DB and runtime config."""
+    await set_setting(session, "WEB_PASSWORD", new_password)
+    settings.WEB_PASSWORD = new_password
 
 
 async def update_settings(session: AsyncSession, new_values: Dict[str, Any]) -> None:

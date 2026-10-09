@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     WEB_HOST: str = Field(default="0.0.0.0", description="WebUI Host binding")
     WEB_PORT: int = Field(default=8080, description="WebUI Port")
     WEB_USERNAME: str = Field(default="admin", description="WebUI Admin username")
-    WEB_PASSWORD: str = Field(default="admin123", description="WebUI Admin password")
+    WEB_PASSWORD: str = Field(default="admin", description="WebUI Admin password")
     WEB_SECRET_KEY: str = Field(default="goguard-panel-secret-key-321", description="Session cookie secret")
 
     @field_validator("ADMIN_IDS", mode="before")

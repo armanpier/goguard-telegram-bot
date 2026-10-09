@@ -321,13 +321,283 @@ def load_existing_env() -> dict[str, str]:
     return existing
 
 
+def detect_installation_state() -> dict:
+    """Inspect system to determine if GoGuard Bot was previously installed and how."""
+    has_env = os.path.exists(".env")
+    has_data_db = os.path.exists("data/bot.db")
+    has_root_db = os.path.exists("bot.db")
+    has_db = has_data_db or has_root_db
+
+    db_size = 0
+    if has_data_db:
+        db_size = os.path.getsize("data/bot.db")
+    elif has_root_db:
+        db_size = os.path.getsize("bot.db")
+    db_size_str = f"{db_size / 1024:.1f} KB" if db_size else "Empty"
+
+    docker_container = None
+    docker_running = False
+    if is_command_available("docker"):
+        try:
+            res = subprocess.run(
+                'docker ps -a --filter "name=goguard_telegram_bot" --format "{{.Names}}|{{.Status}}"',
+                shell=True,
+                capture_output=True,
+                text=True,
+            )
+            out = res.stdout.strip()
+            if "goguard_telegram_bot" in out:
+                docker_container = out
+                docker_running = "Up" in out
+        except Exception:
+            pass
+
+    systemd_service = False
+    systemd_active = False
+    if sys.platform.startswith("linux") and is_command_available("systemctl"):
+        try:
+            res = subprocess.run(
+                "systemctl is-active goguard-bot",
+                shell=True,
+                capture_output=True,
+                text=True,
+            )
+            if res.returncode == 0 and "active" in res.stdout:
+                systemd_service = True
+                systemd_active = True
+            elif os.path.exists("/etc/systemd/system/goguard-bot.service"):
+                systemd_service = True
+        except Exception:
+            pass
+
+    if docker_container:
+        mode_str = f"Docker Compose ({'Running ✅' if docker_running else 'Stopped ⏹️'})"
+    elif systemd_service:
+        mode_str = f"Systemd Service ({'Active ✅' if systemd_active else 'Inactive ⏹️'})"
+    elif has_env and has_db:
+        mode_str = "Python Standalone (Files Present)"
+    elif has_env:
+        mode_str = "Partially Configured (.env Present)"
+    else:
+        mode_str = "None (Fresh Installation)"
+
+    is_installed = has_env or has_db or docker_container is not None or systemd_service
+
+    return {
+        "is_installed": is_installed,
+        "mode_str": mode_str,
+        "has_env": has_env,
+        "has_db": has_db,
+        "db_size_str": db_size_str,
+        "docker_container": docker_container,
+        "docker_running": docker_running,
+        "systemd_service": systemd_service,
+        "systemd_active": systemd_active,
+    }
+
+
+def sanitize_and_patch_env(existing: dict) -> dict:
+    """Ensure .env has all required keys, fixed permissions, and safe formatting."""
+    os.makedirs("data", exist_ok=True)
+    if os.path.exists("bot.db") and not os.path.exists("data/bot.db"):
+        try:
+            shutil.copy2("bot.db", "data/bot.db")
+            print(f"{GREEN}✓ Preserved existing bot.db into data/bot.db{RESET}")
+        except Exception as exc:
+            print(f"{YELLOW}Warning moving bot.db: {exc}{RESET}")
+
+    if sys.platform.startswith("linux"):
+        os.system("chmod -R 777 data >/dev/null 2>&1")
+
+    # Sanitize ADMIN_IDS to JSON list
+    admin_ids = existing.get("ADMIN_IDS", "[]")
+    if not admin_ids.startswith("["):
+        parts = [p.strip() for p in admin_ids.replace("'", "").replace('"', '').split(",") if p.strip()]
+        admin_ids = "[" + ", ".join(parts) + "]"
+        existing["ADMIN_IDS"] = admin_ids
+
+    # Set DATABASE_URL to container path
+    if existing.get("DATABASE_URL") in ("sqlite+aiosqlite:///bot.db", "sqlite+aiosqlite://bot.db"):
+        existing["DATABASE_URL"] = "sqlite+aiosqlite:////app/data/bot.db"
+
+    # Ensure WebUI variables
+    if "WEB_ENABLE" not in existing:
+        existing["WEB_ENABLE"] = "true"
+    if "WEB_HOST" not in existing:
+        existing["WEB_HOST"] = "0.0.0.0"
+    if "WEB_PORT" not in existing:
+        existing["WEB_PORT"] = "8080"
+    if "WEB_USERNAME" not in existing:
+        existing["WEB_USERNAME"] = "admin"
+    if "WEB_PASSWORD" not in existing:
+        existing["WEB_PASSWORD"] = "admin"
+    if "WEB_SECRET_KEY" not in existing:
+        import secrets
+        existing["WEB_SECRET_KEY"] = secrets.token_hex(32)
+
+    # Re-write .env keeping all existing variables
+    lines = []
+    written_keys = set()
+    if os.path.exists(".env"):
+        with open(".env", "r", encoding="utf-8") as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#") and "=" in stripped:
+                    k, _ = stripped.split("=", 1)
+                    k = k.strip()
+                    if k in existing:
+                        lines.append(f"{k}={existing[k]}\n")
+                        written_keys.add(k)
+                    else:
+                        lines.append(line)
+                else:
+                    lines.append(line)
+
+    for k, v in existing.items():
+        if k not in written_keys:
+            lines.append(f"{k}={v}\n")
+
+    with open(".env", "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+    return existing
+
+
+def perform_code_update(state: dict, existing: dict) -> None:
+    """Seamlessly updates repository code, rebuilds containers, preserving all data."""
+    print(f"\n{BOLD}{CYAN}=== 🚀 Updating GoGuard Telegram Bot ==={RESET}")
+    print(f"{CYAN}Preserving all database records, user balances, and configurations...{RESET}\n")
+
+    # 1. Pull latest code if git repo
+    if os.path.isdir(".git"):
+        print("⏳ Pulling latest code from GitHub...")
+        os.system("git stash >/dev/null 2>&1")
+        pull_ret = os.system("git pull origin main")
+        if pull_ret == 0:
+            print(f"{GREEN}✓ Code updated to the latest commit from GitHub!{RESET}")
+        else:
+            print(f"{YELLOW}⚠️ Git pull finished (code {pull_ret}). Continuing with local files...{RESET}")
+
+    # 2. Patch .env & ensure data permissions
+    print("⏳ Verifying configuration and database directory permissions...")
+    existing = sanitize_and_patch_env(existing)
+    print(f"{GREEN}✓ Database preserved at data/bot.db with full 777 permissions.{RESET}")
+
+    # 3. Determine restart mode
+    use_docker = state["docker_container"] is not None or state["docker_running"]
+    use_systemd = state["systemd_service"]
+
+    if not use_docker and not use_systemd:
+        print(f"\n{BOLD}Select launch mode for the update:{RESET}")
+        print("1) Launch with Docker Compose (Recommended)")
+        print("2) Launch with Python directly (python -m app.main)")
+        ch = prompt_input("Enter choice [1/2]", default="1", required=False)
+        use_docker = (ch == "1")
+
+    if use_docker:
+        print(f"\n{CYAN}🐳 Restarting container with Docker Compose...{RESET}")
+        docker_ok, compose_cmd = ensure_docker_and_compose()
+        if not docker_ok:
+            print(f"{RED}❌ Docker is not ready. Aborting container restart.{RESET}")
+            return
+
+        print("⏳ Stopping previous container...")
+        os.system(f"{compose_cmd} down >/dev/null 2>&1")
+
+        print(f"⏳ Rebuilding and launching containers ({compose_cmd} up -d --build)...")
+        build_ret = os.system(f"{compose_cmd} up -d --build")
+        if build_ret == 0:
+            print(f"\n{GREEN}{BOLD}══════════════════════════════════════════════════════════════════{RESET}")
+            print(f"{GREEN}{BOLD}      🎉 GoGuard Telegram Bot Updated Successfully!               {RESET}")
+            print(f"{GREEN}{BOLD}══════════════════════════════════════════════════════════════════{RESET}\n")
+            print(f"• {BOLD}User Data:{RESET} 100% Preserved in data/bot.db (no data loss)")
+            print(f"• {BOLD}Telegram Bot:{RESET} Running in background via Docker")
+            print(f"• {BOLD}🌐 WebUI Management Panel:{RESET} http://<your-vps-ip>:8080")
+            print(f"  Initial Credentials: Username: {BOLD}admin{RESET} | Password: {BOLD}admin{RESET}")
+            print(f"  {YELLOW}⚠️ Note: You will be asked to set a new password on your first login!{RESET}")
+            print(f"\nTo monitor real-time logs:")
+            print(f"  {BOLD}{compose_cmd} logs -f{RESET}\n")
+        else:
+            print(f"{RED}❌ Docker build failed with code {build_ret}. Check docker logs above.{RESET}")
+
+    elif use_systemd:
+        print(f"\n{CYAN}⚙️ Updating Python environment and restarting systemd service...{RESET}")
+        os.system("pip install -r requirements.txt")
+        ret = os.system("systemctl restart goguard-bot")
+        if ret == 0:
+            print(f"{GREEN}✓ Service goguard-bot restarted successfully!{RESET}")
+            print(f"🌐 WebUI Management Panel: http://<your-vps-ip>:8080")
+            print(f"Logs: journalctl -u goguard-bot -f")
+        else:
+            print(f"{RED}❌ Failed to restart systemd service (exit code {ret}).{RESET}")
+
+    else:
+        print(f"\n{CYAN}📦 Installing updated Python packages in virtual environment...{RESET}")
+        os.system("pip install -r requirements.txt")
+        print(f"{GREEN}✓ Update ready! Launching bot...{RESET}\n")
+        python_exec = sys.executable
+        os.system(f'"{python_exec}" -m app.main')
+
+
+def view_service_logs(state: dict) -> None:
+    """Display real-time logs for Docker or Systemd."""
+    print(f"\n{BOLD}{CYAN}=== 📊 Live Service Logs ==={RESET}\n")
+    if is_command_available("docker"):
+        compose_cmd = get_docker_compose_cmd() or "docker compose"
+        os.system(f"{compose_cmd} ps")
+        print("\nLast 30 container log lines:")
+        os.system(f"{compose_cmd} logs --tail=30")
+    elif sys.platform.startswith("linux") and state.get("systemd_service"):
+        os.system("systemctl status goguard-bot --no-pager")
+        os.system("journalctl -u goguard-bot -n 30 --no-pager")
+    else:
+        print(f"{YELLOW}No active container or systemd service detected.{RESET}")
+    input(f"\n{BOLD}Press Enter to return to menu...{RESET}")
+
+
 def main():
     clear_screen()
     print_banner()
 
+    state = detect_installation_state()
     existing = load_existing_env()
-    if existing:
-        print(f"{YELLOW}ℹ️ Found existing .env file. Press Enter on any field to keep the current value.{RESET}\n")
+
+    if state["is_installed"]:
+        print(f"{CYAN}{BOLD}╔══════════════════════════════════════════════════════════════════╗{RESET}")
+        print(f"{CYAN}{BOLD}║         🔍 Existing GoGuard Bot Installation Detected!           ║{RESET}")
+        print(f"{CYAN}{BOLD}╚══════════════════════════════════════════════════════════════════╝{RESET}")
+        print(f"• {BOLD}Deployment Status:{RESET} {state['mode_str']}")
+        if state['has_db']:
+            print(f"• {BOLD}Database File:{RESET} data/bot.db (Size: {state['db_size_str']}) -> {GREEN}Preserved & Safe{RESET}")
+        if state['has_env']:
+            print(f"• {BOLD}Configuration:{RESET} .env file found -> {GREEN}Preserved{RESET}")
+        print(f"• {BOLD}WebUI Panel:{RESET} Port 8080 (Initial: admin / admin -> force password change)")
+        print(f"──────────────────────────────────────────────────────────────────\n")
+
+        print(f"{BOLD}What would you like to do?{RESET}")
+        print(f"1) 🚀 {GREEN}{BOLD}Update Code & Restart{RESET} (Pull latest code, rebuild/restart, KEEP ALL DATA)")
+        print(f"2) ⚙️  Reconfigure Settings (Interactively edit .env credentials)")
+        print(f"3) 📊 Check Bot Status & View Logs")
+        print(f"4) 🔄 Fresh Installation (Overwrite settings from scratch)")
+        print(f"5) ❌ Exit\n")
+
+        choice = prompt_input("Select an option [1/2/3/4/5]", default="1", required=False)
+
+        if choice == "1":
+            perform_code_update(state, existing)
+            return
+        elif choice == "3":
+            view_service_logs(state)
+            main()
+            return
+        elif choice == "5":
+            print(f"\n{YELLOW}Exiting installer.{RESET}")
+            sys.exit(0)
+        elif choice == "4":
+            if not prompt_yes_no("Are you sure you want to perform a fresh reinstall?", default=False):
+                print(f"\n{YELLOW}Reinstallation cancelled.{RESET}")
+                return
+        # If choice == "2", continue with questionnaire with pre-filled defaults
 
     # =========================================================================
     # Step 1: Telegram Bot Configuration
@@ -509,7 +779,7 @@ def main():
     )
     web_password = prompt_password(
         "WebUI Admin Password",
-        default=existing.get("WEB_PASSWORD", "admin123"),
+        default=existing.get("WEB_PASSWORD", "admin"),
         required=False,
     )
     import secrets
@@ -584,7 +854,8 @@ DEBUG=false
 
     print(f"{GREEN}✓ Production configuration saved to .env successfully!{RESET}\n")
     print(f"{CYAN}🌐 WebUI Panel will run on: {BOLD}http://<your-server-ip>:8080{RESET}")
-    print(f"   Credentials: Username: {BOLD}{web_username}{RESET} / Password: (hidden)\n")
+    print(f"   Credentials: Username: {BOLD}{web_username}{RESET} / Password: (hidden)")
+    print(f"   {YELLOW}⚠️ Note: On your first login (admin/admin), you will be asked to set a new password.{RESET}\n")
 
     # =========================================================================
     # Next Steps / Start Option

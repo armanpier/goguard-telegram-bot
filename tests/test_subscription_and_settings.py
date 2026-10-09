@@ -50,3 +50,41 @@ async def test_settings_service_crud():
         assert "GOGUARD_BASE_URL" in all_sets
 
     await test_engine.dispose()
+
+
+def test_installer_detection_and_sanitize(tmp_path, monkeypatch):
+    """Verify setup.py can detect existing files and sanitize env safely."""
+    from setup import detect_installation_state, sanitize_and_patch_env
+    
+    # Change working directory to isolated temp path
+    monkeypatch.chdir(tmp_path)
+    
+    # 1. Fresh state
+    fresh_state = detect_installation_state()
+    assert fresh_state["is_installed"] is False
+    assert fresh_state["has_env"] is False
+    assert fresh_state["has_db"] is False
+    
+    # 2. Simulate existing installation
+    (tmp_path / ".env").write_text("BOT_TOKEN=123:abc\nADMIN_IDS=123456\nCARD_NUMBER=6037\n", encoding="utf-8")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "bot.db").write_text("fake db", encoding="utf-8")
+    
+    detected = detect_installation_state()
+    assert detected["is_installed"] is True
+    assert detected["has_env"] is True
+    assert detected["has_db"] is True
+    
+    # 3. Sanitize and patch
+    env_data = {"BOT_TOKEN": "123:abc", "ADMIN_IDS": "123456", "CARD_NUMBER": "6037"}
+    patched = sanitize_and_patch_env(env_data)
+    
+    # ADMIN_IDS should be converted to JSON list
+    assert patched["ADMIN_IDS"] == "[123456]"
+    # Web variables injected
+    assert patched["WEB_ENABLE"] == "true"
+    assert patched["WEB_PORT"] == "8080"
+    assert patched["WEB_USERNAME"] == "admin"
+    assert patched["WEB_PASSWORD"] == "admin"
+    assert "WEB_SECRET_KEY" in patched
+
