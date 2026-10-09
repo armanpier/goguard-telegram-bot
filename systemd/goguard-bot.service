@@ -1,0 +1,17 @@
+[Unit]
+Description=GoGuard Telegram Subscription Bot (Mirzabot Workflow)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/goguard-telegram-bot
+EnvironmentFile=/opt/goguard-telegram-bot/.env
+ExecStart=/opt/goguard-telegram-bot/.venv/bin/python -m app.main
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  goguard-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goguard_telegram_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      # Mount SQLite db directory for persistence
+      - bot_data:/app
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///data/bot.db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bot_data:
