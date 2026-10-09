@@ -82,5 +82,5 @@ async def handle_wallet_receipt_photo(
 async def handle_non_photo_receipt(message: Message):
     """Remind user to send an actual photo of the receipt."""
     await message.answer(
-        "⚠️ لطفاً رسید واریز را به صورت **عکس (Photo)** ارسال نمایید یا در صورت انصراف، دکمه «❌ انصراف و بازگشت» را لمس کنید."
+        "⚠️ لطفاً رسید واریز را به صورت **عکس (Photo)** ارسال نمایید یا در صورت انصراف، دکمه «بازگشت» را لمس کنید."
     )

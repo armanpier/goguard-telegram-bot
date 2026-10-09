@@ -39,13 +39,21 @@ A complete, production-ready Telegram Bot written in Python for selling and mana
 - 📚 **Setup Guides:** Step-by-step connection tutorials for Android, iOS, Windows, and macOS.
 - 📢 **Force-Join Channel:** Optional mandatory Telegram channel subscription check before bot access.
 
-### 👑 For Administrators (`/admin`)
+### 🌐 Modern WebUI Admin Panel (FastAPI + Tailwind RTL)
+- 📊 **Executive Dashboard:** Live KPIs (total users, active subs, total sales, pending receipts), GoGuard Panel API connectivity status widget.
+- ⚙️ **Dynamic Settings Management:** Real-time modification of bank card details, GoGuard credentials, support ID, channel ID, free trial quotas, and referral percentages without bot restarts.
+- 💳 **Receipt Moderation:** Filterable receipt feed (All / Pending / Approved / Rejected) with Telegram image preview and 1-click approve/reject actions.
+- 📦 **Plan Catalog Management:** Create new plans, toggle active/inactive status, and delete plans.
+- 👥 **User Management:** Instant user search (by Telegram ID or username), wallet balance credit/debit adjustment, and ban/unban toggles.
+- 🔗 **Subscriptions Overview:** View all issued client accounts, real-time sync with GoGuard Panel, and deletion.
+
+### 👑 For Administrators via Telegram (`/admin`)
 - 📊 **Bot Analytics:** Real-time statistics on total registered users, active subscriptions, pending receipts, and total sales.
 - 💳 **Receipt Moderation:** Immediate notification when a user submits a receipt photo with inline `[✅ تایید و فعال‌سازی]` and `[❌ رد پرداخت]` buttons.
 - 📦 **Plan Management (CRUD):** Add, toggle active/inactive, or delete plans right from Telegram without restarting the bot.
 - 📢 **Mass Broadcast:** Asynchronous rate-limited message broadcasting to all bot users with progress reporting.
 - 🌐 **GoGuard Panel Diagnostics:** Live API health check and token authentication status test.
-- ⚙️ **Runtime Configuration:** Quick overview of bot parameters.
+- 🔙 **Consistent Navigation:** Standardized **"بازگشت"** button across all conversational states.
 
 ---
 
@@ -238,7 +246,12 @@ The wizard will:
 | `GOGUARD_USERNAME` | String | *Required* | GoGuard Admin username |
 | `GOGUARD_PASSWORD` | String | *Required* | GoGuard Admin password |
 | `GOGUARD_SUB_URL_TEMPLATE` | String | `{base_url}/sub/{username}` | Fallback subscription URL template |
-| `DATABASE_URL` | String | `sqlite+aiosqlite:///bot.db` | SQLAlchemy connection string |
+| `DATABASE_URL` | String | `sqlite+aiosqlite:////app/data/bot.db` | SQLAlchemy connection string |
+| `WEB_ENABLE` | Boolean | `true` | Enable or disable the WebUI Admin Panel |
+| `WEB_PORT` | Integer | `8080` | Port for the WebUI Admin Panel |
+| `WEB_USERNAME` | String | `admin` | Admin username for WebUI login |
+| `WEB_PASSWORD` | String | `admin123` | Admin password for WebUI login |
+| `WEB_SECRET_KEY` | String | *Auto-generated* | Secret key for signing admin session cookies |
 | `CARD_NUMBER` | String | `6037-9918-0000-0000` | Bank card number for manual transfers |
 | `CARD_HOLDER` | String | `نام دارنده کارت` | Name of the bank card holder |
 | `CURRENCY_TITLE` | String | `تومان` | Display currency name (e.g. تومان, IRT) |
@@ -259,10 +272,13 @@ Run the test suite using `pytest`:
 pytest -v
 ```
 
-All 12 unit tests will execute, validating:
+All 18 unit tests will execute, validating:
 - GoGuard admin token parsing and headers.
 - GoGuard automatic token refresh on 401 Unauthorized responses.
 - Accurate byte conversion (`GB -> Bytes`) and Unix epoch timestamps.
+- Alphanumeric GoGuard username generation (`^[a-z0-9]+$`) and clean ASCII notes.
+- WebUI HMAC session cookie authentication and route protection.
+- Dynamic runtime settings database persistence and `.env` fallbacks.
 - Jalali date conversions, progress bars, and currency formatting.
 
 ---

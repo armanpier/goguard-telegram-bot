@@ -29,7 +29,29 @@ class GoGuardAPIError(GoGuardError):
         self.status_code = status_code
         self.message = message
         self.response_body = response_body
-        super().__init__(f"GoGuard API Error ({status_code}): {message}")
+
+        detail = ""
+        if response_body:
+            try:
+                if isinstance(response_body, str):
+                    parsed = json.loads(response_body)
+                else:
+                    parsed = response_body
+                if isinstance(parsed, dict):
+                    detail = (
+                        parsed.get("detail")
+                        or parsed.get("message")
+                        or parsed.get("error")
+                        or parsed.get("msg")
+                        or str(parsed)
+                    )
+                else:
+                    detail = str(response_body)
+            except Exception:
+                detail = str(response_body)
+
+        full_msg = f"{message} | {detail}" if detail and detail not in message else message
+        super().__init__(f"GoGuard API Error ({status_code}): {full_msg}")
 
 
 class GoGuardConnectionError(GoGuardError):

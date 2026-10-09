@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}اشتراک‌ها - GoGuard Bot{% endblock %}
+{% block header_title %}مدیریت اشتراک‌های صادرشده{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    {% if message %}
+    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+        <span>✅</span>
+        <span>{{ message }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Subscriptions List Table -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h4 class="font-bold text-gray-900 text-sm">⚡️ لیست کلیه سرویس‌ها</h4>
+            <span class="text-xs text-gray-400">تعداد: {{ subscriptions | length }} سرویس</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs">
+                <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-3">یوزرنیم پنل</th>
+                        <th class="px-6 py-3">کاربر</th>
+                        <th class="px-6 py-3">نوع پلن</th>
+                        <th class="px-6 py-3">سقف ترافیک</th>
+                        <th class="px-6 py-3">تاریخ انقضا</th>
+                        <th class="px-6 py-3">وضعیت</th>
+                        <th class="px-6 py-3">لینک اشتراک</th>
+                        <th class="px-6 py-3 text-center">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-gray-700">
+                    {% for sub in subscriptions %}
+                    <tr class="hover:bg-gray-50/70 transition">
+                        <td class="px-6 py-3.5 font-mono font-bold text-blue-600">{{ sub.goguard_username }}</td>
+                        <td class="px-6 py-3.5">
+                            <div class="font-medium text-gray-900">{{ sub.user.full_name or 'کاربر' }}</div>
+                            <div class="text-[11px] text-gray-400 font-mono">TG ID: {{ sub.user_id }}</div>
+                        </td>
+                        <td class="px-6 py-3.5">
+                            {% if sub.is_trial %}
+                            <span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px]">تست رایگان 🎁</span>
+                            {% elif sub.plan %}
+                            {{ sub.plan.title }}
+                            {% else %}
+                            سفارشی
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-3.5 font-mono">{{ sub.data_limit_bytes | bytes_to_human }}</td>
+                        <td class="px-6 py-3.5">{{ sub.expire_timestamp | format_timestamp }}</td>
+                        <td class="px-6 py-3.5">
+                            {% if sub.status == 'active' %}
+                            <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium">فعال 🟢</span>
+                            {% else %}
+                            <span class="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-medium">{{ sub.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-3.5 font-mono text-[11px]">
+                            <button onclick="navigator.clipboard.writeText('{{ sub.sub_url }}'); alert('لینک اشتراک کپی شد!');"
+                                class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 transition">
+                                کپی لینک 🔗
+                            </button>
+                        </td>
+                        <td class="px-6 py-3.5 text-center flex items-center justify-center gap-2">
+                            <form method="POST" action="/subscriptions/{{ sub.id }}/sync">
+                                <button type="submit" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs transition">
+                                    همگام‌سازی 🔄
+                                </button>
+                            </form>
+                            <form method="POST" action="/subscriptions/{{ sub.id }}/delete" onsubmit="return confirm('آیا از حذف این اشتراک از دیتابیس و پنل GoGuard مطمئن هستید؟')">
+                                <button type="submit" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs transition">
+                                    حذف 🗑
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if not subscriptions %}
+        <div class="p-8 text-center text-gray-400 text-xs">
+            هیچ اشتراکی تاکنون صادر نشده است.
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}مدیریت کاربران - GoGuard Bot{% endblock %}
+{% block header_title %}مدیریت کاربران ربات{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    {% if message %}
+    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+        <span>✅</span>
+        <span>{{ message }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Search Form -->
+    <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+        <form method="GET" action="/users" class="flex items-center gap-3 w-full max-w-md">
+            <input type="text" name="q" value="{{ query or '' }}" placeholder="جستجو بر اساس شناسه یا یوزرنیم..."
+                class="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:border-blue-500 text-gray-800 text-xs">
+            <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-medium transition shadow">
+                جستجو 🔍
+            </button>
+            {% if query %}
+            <a href="/users" class="text-xs text-gray-500 hover:text-gray-700">لغو فیلتر</a>
+            {% endif %}
+        </form>
+        <div class="text-xs text-gray-500">
+            تعداد کاربران: <span class="font-bold text-gray-900">{{ users | length }}</span>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs">
+                <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-3">شناسه کاربری</th>
+                        <th class="px-6 py-3">نام و نام خانوادگی</th>
+                        <th class="px-6 py-3">نام کاربری (Username)</th>
+                        <th class="px-6 py-3">موجودی کیف پول</th>
+                        <th class="px-6 py-3">وضعیت حساب</th>
+                        <th class="px-6 py-3 text-center">عملیات ادمین</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-gray-700">
+                    {% for u in users %}
+                    <tr class="hover:bg-gray-50/70 transition">
+                        <td class="px-6 py-3.5 font-mono font-semibold text-gray-900">{{ u.id }}</td>
+                        <td class="px-6 py-3.5 font-medium text-gray-900">{{ u.full_name or 'نامشخص' }}</td>
+                        <td class="px-6 py-3.5 text-gray-500 font-mono">
+                            {% if u.username %}@{{ u.username }}{% else %}<span class="text-gray-300">ندارد</span>{% endif %}
+                        </td>
+                        <td class="px-6 py-3.5 font-bold text-emerald-600">{{ u.balance | format_price }}</td>
+                        <td class="px-6 py-3.5">
+                            {% if u.is_banned %}
+                            <span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-medium">مسدود ⛔️</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium">فعال 🟢</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-3.5 text-center flex items-center justify-center gap-3">
+                            <!-- Adjust Balance Form -->
+                            <form method="POST" action="/users/{{ u.id }}/balance" class="flex items-center gap-1">
+                                <input type="number" name="amount" placeholder="مبلغ (+ یا -)" required
+                                    class="w-24 px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono">
+                                <button type="submit" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[11px] transition">
+                                    تغییر موجودی
+                                </button>
+                            </form>
+
+                            <!-- Ban / Unban Form -->
+                            <form method="POST" action="/users/{{ u.id }}/toggle_ban">
+                                <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-medium transition {% if u.is_banned %}bg-emerald-50 text-emerald-600 hover:bg-emerald-100{% else %}bg-rose-50 text-rose-600 hover:bg-rose-100{% endif %}">
+                                    {% if u.is_banned %}رفع مسدودی{% else %}مسدودسازی{% endif %}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if not users %}
+        <div class="p-8 text-center text-gray-400 text-xs">
+            کاربری با این مشخصات یافت نشد.
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

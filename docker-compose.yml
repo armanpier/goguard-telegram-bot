@@ -9,6 +9,8 @@ services:
       - .env
     volumes:
       - ./data:/app/data
+    ports:
+      - "8080:8080"
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/bot.db
     logging:

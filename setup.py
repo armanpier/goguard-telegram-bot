@@ -496,9 +496,24 @@ def main():
     # Database
     db_url = prompt_input(
         "Database URL",
-        default=existing.get("DATABASE_URL", "sqlite+aiosqlite:///bot.db"),
+        default=existing.get("DATABASE_URL", "sqlite+aiosqlite:////app/data/bot.db"),
         required=False,
     )
+
+    # WebUI Management Panel
+    print(f"\n{CYAN}--- WebUI Management Panel Settings ---{RESET}")
+    web_username = prompt_input(
+        "WebUI Admin Username",
+        default=existing.get("WEB_USERNAME", "admin"),
+        required=False,
+    )
+    web_password = prompt_password(
+        "WebUI Admin Password",
+        default=existing.get("WEB_PASSWORD", "admin123"),
+        required=False,
+    )
+    import secrets
+    web_secret = existing.get("WEB_SECRET_KEY") or secrets.token_hex(32)
 
     # =========================================================================
     # Save .env File
@@ -526,6 +541,16 @@ GOGUARD_TIMEOUT_SECONDS=15
 # Database Configuration
 # ==========================================
 DATABASE_URL={db_url}
+
+# ==========================================
+# Web Management Panel (FastAPI WebUI)
+# ==========================================
+WEB_ENABLE=true
+WEB_HOST=0.0.0.0
+WEB_PORT=8080
+WEB_USERNAME={web_username}
+WEB_PASSWORD={web_password}
+WEB_SECRET_KEY={web_secret}
 
 # ==========================================
 # Payment (Card-to-Card) Configuration
@@ -558,6 +583,8 @@ DEBUG=false
         f.write(env_content)
 
     print(f"{GREEN}✓ Production configuration saved to .env successfully!{RESET}\n")
+    print(f"{CYAN}🌐 WebUI Panel will run on: {BOLD}http://<your-server-ip>:8080{RESET}")
+    print(f"   Credentials: Username: {BOLD}{web_username}{RESET} / Password: (hidden)\n")
 
     # =========================================================================
     # Next Steps / Start Option

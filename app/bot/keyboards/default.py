@@ -32,10 +32,13 @@ def get_main_menu_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
 
 
 def get_cancel_keyboard() -> ReplyKeyboardMarkup:
-    """Cancel / Back button for active state."""
+    """Standard back button keyboard."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="❌ انصراف و بازگشت")]
+            [KeyboardButton(text="بازگشت")]
         ],
         resize_keyboard=True,
     )
+
+
+get_back_keyboard = get_cancel_keyboard  # Alias

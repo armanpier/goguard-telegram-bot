@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     DEFAULT_LANGUAGE: str = Field(default="fa", description="Default bot language (fa/en)")
     DEBUG: bool = Field(default=False, description="Debug mode")
 
+    # WebUI Panel
+    WEB_ENABLE: bool = Field(default=True, description="Enable WebUI Management Panel")
+    WEB_HOST: str = Field(default="0.0.0.0", description="WebUI Host binding")
+    WEB_PORT: int = Field(default=8080, description="WebUI Port")
+    WEB_USERNAME: str = Field(default="admin", description="WebUI Admin username")
+    WEB_PASSWORD: str = Field(default="admin123", description="WebUI Admin password")
+    WEB_SECRET_KEY: str = Field(default="goguard-panel-secret-key-321", description="Session cookie secret")
+
     @field_validator("ADMIN_IDS", mode="before")
     @classmethod
     def parse_admin_ids(cls, v) -> List[int]:

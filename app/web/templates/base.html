@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}پنل مدیریت GoGuard Bot{% endblock %}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Vazirmatn -->
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col md:flex-row">
+
+    <!-- Mobile Top Bar -->
+    <div class="md:hidden bg-slate-900 text-white flex items-center justify-between p-4 shadow">
+        <div class="font-bold text-lg flex items-center gap-2">
+            <span>🚀</span>
+            <span>مدیریت GoGuard Bot</span>
+        </div>
+        <button id="mobileMenuBtn" class="p-2 rounded hover:bg-slate-800">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <aside id="sidebar" class="hidden md:flex flex-col w-64 bg-slate-900 text-slate-200 min-h-screen p-5 shrink-0 shadow-lg">
+        <div class="flex items-center gap-3 pb-6 border-b border-slate-800">
+            <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xl shadow-md">
+                🚀
+            </div>
+            <div>
+                <h1 class="font-bold text-white text-base">GoGuard Panel</h1>
+                <p class="text-xs text-slate-400">سیستم فروش و مدیریت اشتراک</p>
+            </div>
+        </div>
+
+        <nav class="mt-6 flex-1 space-y-1">
+            <a href="/" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-slate-800 {% if active_page == 'dashboard' %}bg-blue-600 text-white{% else %}text-slate-300{% endif %}">
+                <span>📊</span>
+                <span>داشبورد و آمار</span>
+            </a>
+            <a href="/receipts" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-slate-800 {% if active_page == 'receipts' %}bg-blue-600 text-white{% else %}text-slate-300{% endif %}">
+                <span>💳</span>
+                <span>رسیدهای پرداخت</span>
+            </a>
+            <a href="/plans" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-slate-800 {% if active_page == 'plans' %}bg-blue-600 text-white{% else %}text-slate-300{% endif %}">
+                <span>📦</span>
+                <span>مدیریت تعرفه‌ها (پلن‌ها)</span>
+            </a>
+            <a href="/subscriptions" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-slate-800 {% if active_page == 'subscriptions' %}bg-blue-600 text-white{% else %}text-slate-300{% endif %}">
+                <span>⚡️</span>
+                <span>اشتراک‌ها (سرویس‌ها)</span>
+            </a>
+            <a href="/users" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-slate-800 {% if active_page == 'users' %}bg-blue-600 text-white{% else %}text-slate-300{% endif %}">
+                <span>👥</span>
+                <span>مدیریت کاربران</span>
+            </a>
+            <a href="/settings" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition hover:bg-slate-800 {% if active_page == 'settings' %}bg-blue-600 text-white{% else %}text-slate-300{% endif %}">
+                <span>⚙️</span>
+                <span>تنظیمات ربات و پنل</span>
+            </a>
+        </nav>
+
+        <div class="pt-6 border-t border-slate-800 mt-auto">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-3 px-2">
+                <span>کاربر ادمین:</span>
+                <span class="text-white font-semibold">{{ current_user or 'Admin' }}</span>
+            </div>
+            <a href="/logout" class="flex items-center justify-center gap-2 w-full py-2 px-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-lg transition">
+                <span>🚪</span>
+                <span>خروج از پنل</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col min-w-0 bg-gray-50 overflow-y-auto">
+        <!-- Top Header -->
+        <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">{% block header_title %}داشبورد مدیریت{% endblock %}</h2>
+                <p class="text-xs text-gray-500 mt-0.5">سیستم یکپارچه فروش پروکسی متصل به GoGuard API 1.0</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <span>ربات فعال</span>
+                </span>
+            </div>
+        </header>
+
+        <!-- Body Content -->
+        <div class="p-6 md:p-8 flex-1">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <script>
+        // Toggle mobile menu
+        const menuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        if (menuBtn && sidebar) {
+            menuBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('hidden');
+            });
+        }
+    </script>
+</body>
+</html>

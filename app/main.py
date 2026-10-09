@@ -86,11 +86,38 @@ async def main() -> None:
     bot_info = await bot.get_me()
     logger.info(f"Bot @{bot_info.username} (ID: {bot_info.id}) started polling.")
 
-    # 6. Start Polling with clean shutdown
+    # 6. Start WebUI Management Panel (FastAPI + Uvicorn) if enabled
+    web_server = None
+    web_task = None
+    if settings.WEB_ENABLE:
+        try:
+            import uvicorn
+            from app.web.app import create_web_app
+            web_app = create_web_app(bot=bot, goguard=goguard_client)
+            web_config = uvicorn.Config(
+                app=web_app,
+                host=settings.WEB_HOST,
+                port=settings.WEB_PORT,
+                log_level="warning",
+            )
+            web_server = uvicorn.Server(web_config)
+            web_task = asyncio.create_task(web_server.serve())
+            logger.info(f"WebUI management panel running on http://{settings.WEB_HOST}:{settings.WEB_PORT}")
+        except Exception as exc:
+            logger.error(f"Failed to start WebUI management panel: {exc}")
+
+    # 7. Start Polling with clean shutdown
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        logger.info("Shutting down bot...")
+        logger.info("Shutting down bot and background services...")
+        if web_server:
+            web_server.should_exit = True
+            if web_task:
+                try:
+                    await asyncio.wait_for(web_task, timeout=5.0)
+                except Exception:
+                    pass
         await goguard_client.close()
         await bot.session.close()
         logger.info("Clean shutdown completed.")

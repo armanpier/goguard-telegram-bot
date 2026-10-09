@@ -62,12 +62,12 @@ async def handle_help(message: Message, is_admin: bool):
     await message.answer(help_text, reply_markup=kb)
 
 
-@router.message(F.text == "❌ انصراف و بازگشت")
+@router.message(F.text.in_(["بازگشت", "🔙 بازگشت", "❌ انصراف و بازگشت", "انصراف", "back", "Back"]))
 async def handle_cancel(message: Message, state: FSMContext, is_admin: bool):
     """Cancel any active FSM state and return to main menu."""
     await state.clear()
     kb = get_main_menu_keyboard(is_admin=is_admin)
-    await message.answer("عملیات لغو شد. به منوی اصلی بازگشتید.", reply_markup=kb)
+    await message.answer("به منوی اصلی بازگشتید.", reply_markup=kb)
 
 
 @router.callback_query(F.data == "check_channel_join")

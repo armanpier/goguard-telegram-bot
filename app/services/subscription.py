@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 def generate_unique_subscription_username(user_id: int) -> str:
-    """Generate clean, unique username for GoGuard panel."""
-    rand_suffix = secrets.token_hex(3)
-    return f"u{user_id}_{rand_suffix}"
+    """Generate clean, alphanumeric lowercase username for GoGuard panel."""
+    rand_suffix = secrets.token_hex(2)
+    return f"u{user_id}{rand_suffix}".lower()
 
 
 async def create_user_subscription(
@@ -35,14 +35,14 @@ async def create_user_subscription(
     if is_trial:
         traffic_bytes = traffic_gb_to_bytes(settings.FREE_TRIAL_TRAFFIC_GB)
         expire_epoch = days_to_epoch_expire(settings.FREE_TRIAL_DURATION_DAYS)
-        note = f"Trial | TG:{user.id} | @{user.username or 'none'}"
+        note = f"TG:{user.id} Trial"
         plan_id = None
     else:
         if not plan:
             raise ValueError("Plan must be provided for non-trial subscriptions")
         traffic_bytes = traffic_gb_to_bytes(plan.traffic_gb)
         expire_epoch = days_to_epoch_expire(plan.duration_days)
-        note = f"Plan:{plan.title} | TG:{user.id} | @{user.username or 'none'}"
+        note = f"TG:{user.id} P:{plan.id}"
         plan_id = plan.id
 
     # 1. Call GoGuard Panel API 1.0
@@ -156,7 +156,7 @@ async def renew_user_subscription(
         data_limit=new_data_limit,
         expire=new_expire,
         status="active",
-        note=f"Renewed Plan:{plan.title} | TG:{sub.user_id}",
+        note=f"TG:{sub.user_id} Renew P:{plan.id}",
     )
 
     sub.data_limit_bytes = new_data_limit
