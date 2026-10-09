@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.database.models import User, Plan, Subscription
 from app.services.goguard import GoGuardClient
@@ -197,6 +198,7 @@ async def show_my_services(message: Message, session: AsyncSession, db_user: Use
     """List all active subscriptions belonging to the user."""
     stmt = (
         select(Subscription)
+        .options(selectinload(Subscription.plan))
         .where(Subscription.user_id == db_user.id)
         .order_by(Subscription.id.desc())
     )
@@ -216,6 +218,7 @@ async def callback_back_to_my_subs(callback: CallbackQuery, session: AsyncSessio
     """Return to my subscriptions list."""
     stmt = (
         select(Subscription)
+        .options(selectinload(Subscription.plan))
         .where(Subscription.user_id == db_user.id)
         .order_by(Subscription.id.desc())
     )
