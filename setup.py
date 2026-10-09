@@ -8,7 +8,10 @@ generating the production .env file and optionally starting the service.
 import getpass
 import json
 import os
+import platform
 import re
+import shutil
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -149,6 +152,157 @@ def validate_goguard_credentials(base_url: str, username: str, password: str) ->
             return False, f"Panel returned HTTP {e.code}"
     except Exception as e:
         return False, f"Could not reach panel: {e}"
+
+
+def is_command_available(cmd: str) -> bool:
+    """Check if an executable exists in system PATH."""
+    return shutil.which(cmd) is not None
+
+
+def is_docker_daemon_running() -> bool:
+    """Verify if the Docker daemon is active and responding."""
+    try:
+        res = subprocess.run(
+            "docker info",
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return res.returncode == 0
+    except Exception:
+        return False
+
+
+def get_docker_compose_cmd() -> str:
+    """Determine whether 'docker compose' or 'docker-compose' is operational."""
+    try:
+        res = subprocess.run(
+            "docker compose version",
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if res.returncode == 0:
+            return "docker compose"
+    except Exception:
+        pass
+
+    try:
+        res = subprocess.run(
+            "docker-compose version",
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if res.returncode == 0:
+            return "docker-compose"
+    except Exception:
+        pass
+
+    return ""
+
+
+def install_docker_on_linux() -> bool:
+    """
+    Automatically installs Docker and the Docker Compose plugin on Linux
+    using the official Docker installation script.
+    """
+    print(f"\n{CYAN}{BOLD}🐳 Docker is not installed on this system.{RESET}")
+    print(f"{YELLOW}Automatically installing Docker and Docker Compose via official repository...{RESET}")
+
+    # Ensure curl is available
+    if not is_command_available("curl"):
+        print("⏳ Installing curl...")
+        if is_command_available("apt-get"):
+            os.system("apt-get update -y && apt-get install -y curl")
+        elif is_command_available("yum"):
+            os.system("yum install -y curl")
+        elif is_command_available("dnf"):
+            os.system("dnf install -y curl")
+
+    # Run official Docker convenience script
+    print("⏳ Running official Docker installer (https://get.docker.com)...")
+    res = os.system("curl -fsSL https://get.docker.com | sh")
+    if res != 0 or not is_command_available("docker"):
+        print(f"{RED}❌ Automatic Docker installation script failed (exit code {res}).{RESET}")
+        return False
+
+    # Start and enable Docker service
+    print("⏳ Enabling and starting Docker daemon...")
+    os.system("systemctl enable --now docker >/dev/null 2>&1 || service docker start >/dev/null 2>&1")
+
+    # Add non-root user to docker group if applicable
+    user = os.getenv("SUDO_USER") or os.getenv("USER")
+    if user and user != "root":
+        os.system(f"usermod -aG docker {user} >/dev/null 2>&1")
+
+    print(f"{GREEN}✓ Docker installed and started successfully!{RESET}")
+    return True
+
+
+def ensure_docker_and_compose() -> tuple[bool, str]:
+    """
+    Ensures Docker and Docker Compose are installed and running.
+    If missing on Linux, installs them automatically.
+    Returns (success: bool, compose_command: str).
+    """
+    # 1. Install Docker if missing
+    if not is_command_available("docker"):
+        if sys.platform.startswith("linux"):
+            if not install_docker_on_linux():
+                return False, ""
+        elif sys.platform == "win32":
+            print(f"{RED}Docker is not installed or not running on Windows.{RESET}")
+            if is_command_available("winget"):
+                if prompt_yes_no("Would you like to install Docker Desktop using winget?", default=True):
+                    print("⏳ Running winget install Docker.DockerDesktop...")
+                    os.system("winget install Docker.DockerDesktop --accept-source-agreements --accept-package-agreements")
+                    print(f"{YELLOW}Please launch Docker Desktop and run this setup again.{RESET}")
+            return False, ""
+        elif sys.platform == "darwin":
+            print(f"{RED}Docker is not installed. Please install Docker Desktop for Mac.{RESET}")
+            return False, ""
+        else:
+            print(f"{RED}Automatic Docker installation is not supported on this OS.{RESET}")
+            return False, ""
+
+    # 2. Check if Docker daemon is running
+    if not is_docker_daemon_running():
+        print("⏳ Docker service is stopped. Attempting to start daemon...")
+        if sys.platform.startswith("linux"):
+            os.system("systemctl start docker >/dev/null 2>&1 || service docker start >/dev/null 2>&1")
+        if not is_docker_daemon_running():
+            print(f"{RED}⚠️ Docker daemon is not active. Please start the Docker service (e.g., sudo systemctl start docker).{RESET}")
+            return False, ""
+
+    # 3. Check for Docker Compose
+    compose_cmd = get_docker_compose_cmd()
+    if not compose_cmd:
+        print("⏳ Docker Compose plugin is missing. Installing docker-compose-plugin...")
+        if sys.platform.startswith("linux"):
+            if is_command_available("apt-get"):
+                os.system("apt-get update -y && apt-get install -y docker-compose-plugin")
+            elif is_command_available("yum"):
+                os.system("yum install -y docker-compose-plugin")
+            elif is_command_available("dnf"):
+                os.system("dnf install -y docker-compose-plugin")
+
+            compose_cmd = get_docker_compose_cmd()
+
+            # Fallback to standalone docker-compose binary from GitHub releases
+            if not compose_cmd:
+                print("⏳ Downloading standalone docker-compose binary...")
+                os.system(
+                    "curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) "
+                    "-o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose"
+                )
+                compose_cmd = get_docker_compose_cmd()
+
+        if not compose_cmd:
+            print(f"{RED}❌ Docker Compose could not be configured automatically.{RESET}")
+            return False, ""
+
+    return True, compose_cmd
 
 
 def load_existing_env() -> dict[str, str]:
@@ -410,8 +564,19 @@ DEBUG=false
     choice = prompt_input("Enter choice [1/2/3]", default="3", required=False)
 
     if choice == "1":
-        print(f"\n{CYAN}Starting Docker Compose...{RESET}")
-        os.system("docker compose up -d --build")
+        docker_ready, compose_cmd = ensure_docker_and_compose()
+        if docker_ready and compose_cmd:
+            print(f"\n{CYAN}Starting containers with {BOLD}{compose_cmd} up -d --build{RESET}...{RESET}")
+            ret = os.system(f"{compose_cmd} up -d --build")
+            if ret == 0:
+                print(f"\n{GREEN}✅ GoGuard Telegram Bot container started successfully!{RESET}")
+                print(f"To monitor logs in real-time:")
+                print(f"  {BOLD}{compose_cmd} logs -f{RESET}\n")
+            else:
+                print(f"\n{RED}❌ Failed to start containers (exit code {ret}). Check the logs above.{RESET}\n")
+        else:
+            print(f"\n{YELLOW}Docker is not ready. You can run the bot directly with Python:{RESET}")
+            print(f"  {BOLD}python -m app.main{RESET}\n")
     elif choice == "2":
         print(f"\n{CYAN}Starting GoGuard Bot directly...{RESET}")
         python_exec = sys.executable
