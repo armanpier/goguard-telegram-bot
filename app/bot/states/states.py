@@ -29,3 +29,8 @@ class AdminUserManageState(StatesGroup):
 
 class AdminRejectReceiptState(StatesGroup):
     waiting_for_reason = State()
+
+
+class AdminManageAdminState(StatesGroup):
+    waiting_for_admin_id = State()
+

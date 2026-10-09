@@ -1,9 +1,10 @@
+import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
-from app.database.models import Setting
+from app.database.models import Setting, User
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,126 @@ CONFIGURABLE_KEYS = [
     "WEB_USERNAME",
     "WEB_PASSWORD",
 ]
+
+
+async def get_admin_ids(session: AsyncSession) -> List[int]:
+    """
+    Retrieve admin IDs from database Setting table, falling back to config.
+    Synchronizes in-memory settings.ADMIN_IDS.
+    """
+    stmt = select(Setting).where(Setting.key == "ADMIN_IDS")
+    res = await session.execute(stmt)
+    record = res.scalar_one_or_none()
+
+    admin_ids: List[int] = []
+    if record and record.value:
+        try:
+            val = record.value.strip()
+            if val.startswith("["):
+                admin_ids = [int(x) for x in json.loads(val)]
+            else:
+                admin_ids = [int(x.strip()) for x in val.split(",") if x.strip()]
+        except Exception as exc:
+            logger.warning(f"Failed to parse ADMIN_IDS from database: {exc}")
+
+    if not admin_ids:
+        # Fallback to runtime settings
+        raw_conf = getattr(settings, "ADMIN_IDS", [])
+        if isinstance(raw_conf, list):
+            admin_ids = [int(x) for x in raw_conf]
+        elif isinstance(raw_conf, int):
+            admin_ids = [raw_conf]
+
+    # Keep in-memory settings synchronized
+    settings.ADMIN_IDS = admin_ids
+    return admin_ids
+
+
+async def add_admin_id(session: AsyncSession, admin_id: int) -> Tuple[bool, str]:
+    """Add a new Telegram admin ID."""
+    if not isinstance(admin_id, int) or admin_id <= 0:
+        return False, "شناسه عددی وارد شده معتبر نمی‌باشد."
+
+    current_ids = await get_admin_ids(session)
+    if admin_id in current_ids:
+        return False, "این کاربر در حال حاضر در لیست ادمین‌ها قرار دارد."
+
+    updated_ids = list(current_ids) + [admin_id]
+    json_val = json.dumps(updated_ids)
+
+    stmt = select(Setting).where(Setting.key == "ADMIN_IDS")
+    res = await session.execute(stmt)
+    record = res.scalar_one_or_none()
+    if record:
+        record.value = json_val
+    else:
+        record = Setting(key="ADMIN_IDS", value=json_val)
+        session.add(record)
+
+    await session.commit()
+    settings.ADMIN_IDS = updated_ids
+    logger.info(f"Added admin {admin_id}. Active admins: {updated_ids}")
+    return True, f"ادمین جدید با شناسه {admin_id} با موفقیت افزوده شد."
+
+
+async def remove_admin_id(session: AsyncSession, admin_id: int) -> Tuple[bool, str]:
+    """Remove a Telegram admin ID with protection against removing the last admin."""
+    current_ids = await get_admin_ids(session)
+    if admin_id not in current_ids:
+        return False, "کاربر مورد نظر در لیست ادمین‌ها یافت نشد."
+
+    if len(current_ids) <= 1:
+        return False, "امکان حذف تنها ادمین باقی‌مانده ربات وجود ندارد!"
+
+    updated_ids = [x for x in current_ids if x != admin_id]
+    json_val = json.dumps(updated_ids)
+
+    stmt = select(Setting).where(Setting.key == "ADMIN_IDS")
+    res = await session.execute(stmt)
+    record = res.scalar_one_or_none()
+    if record:
+        record.value = json_val
+    else:
+        record = Setting(key="ADMIN_IDS", value=json_val)
+        session.add(record)
+
+    await session.commit()
+    settings.ADMIN_IDS = updated_ids
+    logger.info(f"Removed admin {admin_id}. Active admins: {updated_ids}")
+    return True, f"ادمین با شناسه {admin_id} با موفقیت حذف شد."
+
+
+async def get_admin_details(session: AsyncSession) -> List[Dict[str, Any]]:
+    """Get rich profile info for all registered admins."""
+    admin_ids = await get_admin_ids(session)
+    details: List[Dict[str, Any]] = []
+
+    for a_id in admin_ids:
+        stmt = select(User).where(User.id == a_id)
+        user_res = await session.execute(stmt)
+        user = user_res.scalar_one_or_none()
+        if user:
+            details.append({
+                "id": a_id,
+                "username": user.username,
+                "full_name": user.full_name or "بدون نام",
+                "balance": user.balance,
+                "is_banned": user.is_banned,
+                "created_at": user.created_at,
+                "is_registered": True,
+            })
+        else:
+            details.append({
+                "id": a_id,
+                "username": None,
+                "full_name": "کاربر ثبت‌نشده در دیتابیس",
+                "balance": 0,
+                "is_banned": False,
+                "created_at": None,
+                "is_registered": False,
+            })
+
+    return details
 
 
 async def get_all_settings(session: AsyncSession) -> Dict[str, Any]:
@@ -53,8 +174,9 @@ async def get_all_settings(session: AsyncSession) -> Dict[str, Any]:
             merged[key] = getattr(settings, key, "")
 
     # Add bot token and admin ids as read-only / display
+    admin_ids = await get_admin_ids(session)
     merged["BOT_TOKEN"] = getattr(settings, "BOT_TOKEN", "")
-    merged["ADMIN_IDS"] = str(getattr(settings, "ADMIN_IDS", []))
+    merged["ADMIN_IDS"] = str(admin_ids)
     merged["DATABASE_URL"] = getattr(settings, "DATABASE_URL", "")
 
     return merged

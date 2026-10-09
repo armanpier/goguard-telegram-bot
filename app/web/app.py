@@ -2,6 +2,8 @@ import hmac
 import hashlib
 import io
 import logging
+import urllib.parse
+from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, Request, Response, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
@@ -22,6 +24,9 @@ from app.services.settings_service import (
     get_web_credentials,
     is_default_password,
     set_web_password,
+    get_admin_details,
+    add_admin_id,
+    remove_admin_id,
 )
 from app.bot.utils.formatters import format_price, format_timestamp, bytes_to_human
 
@@ -514,6 +519,53 @@ def create_web_app(bot: Bot, goguard: GoGuardClient) -> FastAPI:
                 await session.commit()
 
         return RedirectResponse(url="/users?msg=وضعیت مسدودی کاربر تغییر کرد.", status_code=303)
+
+    # =========================================================================
+    # Admins Management
+    # =========================================================================
+
+    @app.get("/admins", response_class=HTMLResponse)
+    async def admins_page(
+        request: Request,
+        msg: str = "",
+        user: str = Depends(require_auth),
+    ):
+        async with async_session_factory() as session:
+            admins = await get_admin_details(session)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="admins.html",
+            context={
+                "active_page": "admins",
+                "current_user": user,
+                "admins": admins,
+                "message": msg,
+            },
+        )
+
+    @app.post("/admins/add")
+    async def add_admin_route(
+        admin_id: int = Form(...),
+        user: str = Depends(require_auth),
+    ):
+        async with async_session_factory() as session:
+            success, msg = await add_admin_id(session, admin_id)
+
+        encoded_msg = urllib.parse.quote(msg)
+        return RedirectResponse(url=f"/admins?msg={encoded_msg}", status_code=303)
+
+    @app.post("/admins/{admin_id}/delete")
+    async def delete_admin_route(
+        admin_id: int,
+        user: str = Depends(require_auth),
+    ):
+        async with async_session_factory() as session:
+            success, msg = await remove_admin_id(session, admin_id)
+
+        encoded_msg = urllib.parse.quote(msg)
+        return RedirectResponse(url=f"/admins?msg={encoded_msg}", status_code=303)
+
 
     # =========================================================================
     # Subscriptions Management

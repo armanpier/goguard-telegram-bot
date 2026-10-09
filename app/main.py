@@ -49,6 +49,11 @@ async def main() -> None:
     try:
         await init_db()
         logger.info("Database initialized successfully.")
+        from app.database.session import async_session_factory
+        from app.services.settings_service import get_admin_ids
+        async with async_session_factory() as session:
+            admin_ids = await get_admin_ids(session)
+            logger.info(f"Loaded active admin IDs: {admin_ids}")
     except Exception as exc:
         logger.critical(f"Database initialization failed: {exc}")
         sys.exit(1)

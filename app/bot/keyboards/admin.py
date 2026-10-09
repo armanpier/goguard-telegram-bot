@@ -19,9 +19,44 @@ def get_admin_dashboard_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🌐 وضعیت اتصال GoGuard", callback_data="admin_goguard_status"),
         ],
         [
+            InlineKeyboardButton(text="👑 مدیریت ادمین‌ها", callback_data="admin_manage_admins"),
             InlineKeyboardButton(text="⚙️ تنظیمات ربات", callback_data="admin_settings"),
         ]
     ])
+
+
+def get_admins_management_keyboard(admin_details: list, current_user_id: int) -> InlineKeyboardMarkup:
+    """Keyboard for managing bot administrators."""
+    buttons = [
+        [InlineKeyboardButton(text="➕ افزودن ادمین جدید", callback_data="admin_add_admin")]
+    ]
+    for admin in admin_details:
+        aid = admin["id"]
+        is_self = (aid == current_user_id)
+        name = admin.get("full_name") or str(aid)
+        if admin.get("username"):
+            label = f"👤 {name} (@{admin['username']})"
+        else:
+            label = f"👤 {name} ({aid})"
+        if is_self:
+            label += " (شما)"
+
+        row = [InlineKeyboardButton(text=label, callback_data=f"admin_info_admin:{aid}")]
+        if len(admin_details) > 1:
+            del_text = "🗑 خروج خود" if is_self else "🗑 حذف"
+            row.append(InlineKeyboardButton(text=del_text, callback_data=f"admin_del_admin:{aid}"))
+        buttons.append(row)
+
+    buttons.append([InlineKeyboardButton(text="🔙 بازگشت به پنل مدیریت", callback_data="admin_back_home")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_cancel_admin_action_keyboard() -> InlineKeyboardMarkup:
+    """Cancel button returning to admins list."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ انصراف و بازگشت", callback_data="admin_manage_admins")]
+    ])
+
 
 
 def get_receipt_review_keyboard(receipt_id: int) -> InlineKeyboardMarkup:

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}مدیریت ادمین‌ها - GoGuard Bot{% endblock %}
+{% block header_title %}مدیریت ادمین‌های ربات تلگرام{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto">
+
+    {% if message %}
+    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-2">
+            <span>✅</span>
+            <span>{{ message }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Add Admin Card -->
+    <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">➕</span>
+                <h3 class="font-bold text-gray-900 text-sm">افزودن ادمین جدید تلگرام</h3>
+            </div>
+            <span class="text-xs text-gray-400">اعطای دسترسی مدیریت ربات</span>
+        </div>
+
+        <form method="POST" action="/admins/add" class="flex flex-col md:flex-row items-end gap-4">
+            <div class="flex-1 w-full">
+                <label class="block text-xs font-medium text-gray-700 mb-1">شناسه عددی کاربر تلگرام (Telegram User ID)</label>
+                <input type="number" name="admin_id" placeholder="مثال: 123456789" required
+                    class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-800 text-xs font-mono">
+                <p class="text-[11px] text-gray-400 mt-1">
+                    💡 کاربر می‌تواند با استارت کردن ربات‌هایی مانند <span class="font-mono text-gray-600">@userinfobot</span> در تلگرام، شناسه عددی خود را مشاهده نماید.
+                </p>
+            </div>
+            <button type="submit"
+                class="w-full md:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl shadow-md transition text-xs flex items-center justify-center gap-2">
+                <span>👑</span>
+                <span>ثبت و اعطای دسترسی ادمین</span>
+            </button>
+        </form>
+    </div>
+
+    <!-- Active Admins List -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <div class="flex items-center gap-2">
+                <span class="text-lg">👑</span>
+                <h3 class="font-bold text-gray-900 text-sm">لیست ادمین‌های فعال ربات</h3>
+            </div>
+            <div class="text-xs text-gray-500">
+                تعداد ادمین‌ها: <span class="font-bold text-gray-900">{{ admins | length }} نفر</span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs">
+                <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-3">شناسه کاربری (User ID)</th>
+                        <th class="px-6 py-3">نام و نام خانوادگی</th>
+                        <th class="px-6 py-3">نام کاربری (Username)</th>
+                        <th class="px-6 py-3">وضعیت در دیتابیس</th>
+                        <th class="px-6 py-3 text-center">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-gray-700">
+                    {% for a in admins %}
+                    <tr class="hover:bg-gray-50/70 transition">
+                        <td class="px-6 py-3.5 font-mono font-bold text-gray-900">
+                            {{ a.id }}
+                        </td>
+                        <td class="px-6 py-3.5 font-medium text-gray-900">
+                            {{ a.full_name }}
+                        </td>
+                        <td class="px-6 py-3.5 text-gray-500 font-mono">
+                            {% if a.username %}
+                            <a href="https://t.me/{{ a.username }}" target="_blank" class="text-blue-600 hover:underline">
+                                @{{ a.username }}
+                            </a>
+                            {% else %}
+                            <span class="text-gray-300">ندارد</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-3.5">
+                            {% if a.is_registered %}
+                            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium">عضو ربات 🟢</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium">هنوز استارت نکرده ⏳</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-3.5 text-center">
+                            {% if admins | length > 1 %}
+                            <form method="POST" action="/admins/{{ a.id }}/delete" onsubmit="return confirm('آیا از حذف دسترسی ادمین این کاربر (شناسه: {{ a.id }}) اطمینان دارید؟');" class="inline">
+                                <button type="submit"
+                                    class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg text-[11px] font-medium transition shadow-sm">
+                                    🗑 حذف دسترسی ادمین
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="text-xs text-gray-400 italic">تنها ادمین سیستم (غیرقابل حذف)</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Security Information Box -->
+    <div class="bg-blue-50/60 p-5 rounded-2xl border border-blue-100 text-xs text-blue-900 space-y-2">
+        <div class="font-bold flex items-center gap-2">
+            <span>ℹ️</span>
+            <span>نکات امنیتی دسترسی مدیران:</span>
+        </div>
+        <ul class="list-disc list-inside space-y-1 text-blue-800 text-[11px] leading-relaxed">
+            <li>کاربران مندرج در این لیست، به منوی مدیریت <span class="font-mono bg-blue-100 px-1 rounded">/admin</span> در ربات تلگرام دسترسی کامل دارند.</li>
+            <li>ادمین‌ها پیام‌های اطلاع‌رسانی واریز کارت به کارت، تایید یا رد فیش‌های بانکی و آمار فروش را دریافت می‌نمایند.</li>
+            <li>تغییرات ادمین‌ها به صورت آنی و بلادرنگ در ربات اعمال شده و در حافظه و پایگاه داده پایدار ذخیره می‌گردد.</li>
+        </ul>
+    </div>
+
+</div>
+{% endblock %}

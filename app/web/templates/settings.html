@@ -15,6 +15,21 @@
     </div>
     {% endif %}
 
+    <!-- Quick Link to Admins -->
+    <div class="bg-gradient-to-r from-slate-900 to-blue-950 p-5 rounded-2xl text-white shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 border border-slate-800">
+        <div class="flex items-center gap-3">
+            <span class="text-2xl">👑</span>
+            <div>
+                <h3 class="font-bold text-sm">مدیریت ادمین‌های ربات تلگرام</h3>
+                <p class="text-xs text-slate-300 mt-0.5">افزودن یا حذف دسترسی ادمین‌های ربات با اعمال بلادرنگ بدون نیاز به ری‌استارت</p>
+            </div>
+        </div>
+        <a href="/admins" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-xs transition shadow shrink-0 flex items-center gap-1.5">
+            <span>مدیریت ادمین‌ها</span>
+            <span>←</span>
+        </a>
+    </div>
+
     <form method="POST" action="/settings" class="space-y-6">
 
         <!-- 1. GoGuard Panel API 1.0 Configuration -->

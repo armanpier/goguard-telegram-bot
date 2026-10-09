@@ -15,6 +15,7 @@ from app.bot.states.states import (
     AdminBroadcastState,
     AdminUserManageState,
     AdminRejectReceiptState,
+    AdminManageAdminState,
 )
 from app.bot.keyboards.default import get_cancel_keyboard, get_main_menu_keyboard
 from app.bot.keyboards.admin import (
@@ -22,6 +23,13 @@ from app.bot.keyboards.admin import (
     get_plans_management_keyboard,
     get_single_plan_manage_keyboard,
     get_receipt_review_keyboard,
+    get_admins_management_keyboard,
+    get_cancel_admin_action_keyboard,
+)
+from app.services.settings_service import (
+    get_admin_details,
+    add_admin_id,
+    remove_admin_id,
 )
 from app.bot.utils.formatters import format_price
 
@@ -521,3 +529,145 @@ async def callback_admin_settings(callback: CallbackQuery, is_admin: bool):
     kb = get_admin_dashboard_keyboard()
     await callback.message.edit_text(text, reply_markup=kb)
     await callback.answer()
+
+
+# =============================================================================
+# 👑 مدیریت ادمین‌ها (Admin Management)
+# =============================================================================
+
+@router.callback_query(F.data == "admin_manage_admins")
+async def callback_admin_manage_admins(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+    is_admin: bool,
+):
+    """Display list of active admins with add/delete options."""
+    if not is_admin:
+        await callback.answer("دسترسی غیرمجاز", show_alert=True)
+        return
+
+    await state.clear()
+    admins = await get_admin_details(session)
+    text = (
+        "👑 **مدیریت ادمین‌های ربات**\n\n"
+        f"تعداد کل ادمین‌های فعال: **{len(admins)} نفر**\n\n"
+        "در این بخش می‌توانید لیست مدیران ربات را مشاهده نمایید، ادمین جدید اضافه کنید و یا دسترسی ادمین‌های موجود را لغو نمایید.\n\n"
+        "⚠️ *حداقل یک ادمین در سیستم الزامی است و امکان حذف آخرین ادمین وجود ندارد.*"
+    )
+    kb = get_admins_management_keyboard(admins, current_user_id=callback.from_user.id)
+    await callback.message.edit_text(text, reply_markup=kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_add_admin")
+async def callback_admin_add_admin(
+    callback: CallbackQuery,
+    state: FSMContext,
+    is_admin: bool,
+):
+    """Prompt for new admin ID or forwarded message."""
+    if not is_admin:
+        await callback.answer("دسترسی غیرمجاز", show_alert=True)
+        return
+
+    await state.set_state(AdminManageAdminState.waiting_for_admin_id)
+    text = (
+        "➕ **افزودن ادمین جدید تلگرام**\n\n"
+        "لطفاً **شناسه عددی (Telegram User ID)** کاربر مورد نظر را به صورت عدد انگلیسی ارسال نمایید،\n"
+        "یا یکی از پیام‌های آن کاربر را به این چت فوروارد (Forward) کنید.\n\n"
+        "💡 *برای یافتن شناسه عددی، کاربر می‌تواند ربات @userinfobot را استارت نماید.*"
+    )
+    kb = get_cancel_admin_action_keyboard()
+    await callback.message.edit_text(text, reply_markup=kb)
+    await callback.answer()
+
+
+@router.message(AdminManageAdminState.waiting_for_admin_id)
+async def process_admin_add_id(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    is_admin: bool,
+):
+    """Process incoming numeric ID or forwarded message for new admin."""
+    if not is_admin:
+        await message.answer("⛔️ شما به این بخش دسترسی ندارید.")
+        await state.clear()
+        return
+
+    target_id: Optional[int] = None
+    if message.forward_from:
+        target_id = message.forward_from.id
+    elif message.text:
+        cleaned = message.text.strip().replace(" ", "")
+        if cleaned.isdigit():
+            target_id = int(cleaned)
+
+    if not target_id or target_id <= 0:
+        await message.answer(
+            "⚠️ شناسه عددی تلگرام نامعتبر است!\n\n"
+            "لطفاً شناسه عددی کاربر (مانند `123456789`) را به لاتین ارسال کرده یا پیامی از ایشان را فوروارد نمایید.",
+            reply_markup=get_cancel_admin_action_keyboard(),
+        )
+        return
+
+    success, msg = await add_admin_id(session, target_id)
+    await state.clear()
+
+    admins = await get_admin_details(session)
+    kb = get_admins_management_keyboard(admins, current_user_id=message.from_user.id)
+
+    if success:
+        await message.answer(
+            f"✅ **عملیات با موفقیت انجام شد!**\n\n"
+            f"کاربر با شناسه `{target_id}` به عنوان ادمین ربات افزوده شد.",
+            reply_markup=kb,
+        )
+    else:
+        await message.answer(f"⚠️ {msg}", reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("admin_del_admin:"))
+async def callback_admin_delete(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    is_admin: bool,
+):
+    """Remove an admin by Telegram user ID."""
+    if not is_admin:
+        await callback.answer("دسترسی غیرمجاز", show_alert=True)
+        return
+
+    try:
+        target_id = int(callback.data.split(":")[1])
+    except (IndexError, ValueError):
+        await callback.answer("شناسه نامعتبر", show_alert=True)
+        return
+
+    success, msg = await remove_admin_id(session, target_id)
+    if not success:
+        await callback.answer(f"⚠️ {msg}", show_alert=True)
+        return
+
+    await callback.answer(f"✅ {msg}", show_alert=True)
+    # Refresh admin list
+    admins = await get_admin_details(session)
+    text = (
+        "👑 **مدیریت ادمین‌های ربات**\n\n"
+        f"تعداد کل ادمین‌های فعال: **{len(admins)} نفر**\n\n"
+        "در این بخش می‌توانید لیست مدیران ربات را مشاهده نمایید، ادمین جدید اضافه کنید و یا دسترسی ادمین‌های موجود را لغو نمایید.\n\n"
+        "⚠️ *حداقل یک ادمین در سیستم الزامی است و امکان حذف آخرین ادمین وجود ندارد.*"
+    )
+    kb = get_admins_management_keyboard(admins, current_user_id=callback.from_user.id)
+    await callback.message.edit_text(text, reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("admin_info_admin:"))
+async def callback_admin_info(callback: CallbackQuery, is_admin: bool):
+    """Show quick popup info about selected admin."""
+    if not is_admin:
+        return
+    admin_id = callback.data.split(":")[1]
+    await callback.answer(f"شناسه تلگرام: {admin_id}", show_alert=True)
+
