@@ -106,8 +106,8 @@ async def sync_subscription_details(
         }
 
     # GoGuard typical response fields
-    total_bytes = data.get("data_limit") or sub.data_limit_bytes
-    used_traffic = data.get("used_traffic")
+    total_bytes = data.get("limit_usage") or data.get("data_limit") or sub.data_limit_bytes
+    used_traffic = data.get("total_usage") or data.get("used_traffic")
     if used_traffic is None:
         up = data.get("up", 0) or 0
         down = data.get("down", 0) or 0
@@ -115,13 +115,22 @@ async def sync_subscription_details(
     else:
         used_bytes = int(used_traffic)
 
-    expire = data.get("expire") or sub.expire_timestamp
-    status = data.get("status") or sub.status
+    expire = data.get("limit_expire") or data.get("expire") or sub.expire_timestamp
+    status = "active" if data.get("enabled") is True else (data.get("status") or sub.status)
+    sub_url = goguard.get_subscription_url(sub.goguard_username, data) or sub.sub_url
 
     # Update local DB if changed
-    if sub.status != status or sub.expire_timestamp != expire:
+    changed = False
+    if sub.status != status:
         sub.status = status
+        changed = True
+    if sub.expire_timestamp != expire:
         sub.expire_timestamp = expire
+        changed = True
+    if sub.sub_url != sub_url:
+        sub.sub_url = sub_url
+        changed = True
+    if changed:
         await session.commit()
 
     return {

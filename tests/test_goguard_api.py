@@ -71,6 +71,7 @@ async def test_goguard_create_subscription():
             assert payload["expire"] == 1775730000
             assert payload["status"] == "active"
             assert payload["note"] == "Test customer"
+            assert payload["services"] == [1]
             return httpx.Response(
                 200,
                 json={
@@ -117,7 +118,7 @@ async def test_goguard_automatic_token_refresh_on_401():
         if request.url.path == "/api/admins/token":
             return httpx.Response(200, json={"token": f"fresh_token_{request_count}", "expires_at": 1893456000})
 
-        if request.url.path == "/api/subscriptions/john_doe":
+        if request.url.path == "/api/subscriptions":
             request_count += 1
             if request_count == 1:
                 # First time: simulate expired token -> 401 Unauthorized
@@ -128,10 +129,12 @@ async def test_goguard_automatic_token_refresh_on_401():
                 return httpx.Response(
                     200,
                     json={
-                        "username": "john_doe",
-                        "data_limit": 10737418240,
-                        "used_traffic": 524288000,
-                        "status": "active",
+                        "items": [{
+                            "username": "john_doe",
+                            "data_limit": 10737418240,
+                            "used_traffic": 524288000,
+                            "status": "active",
+                        }]
                     },
                 )
 
@@ -159,8 +162,10 @@ async def test_goguard_delete_subscription():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/admins/token":
             return httpx.Response(200, json={"token": "tok_123", "expires_at": 1893456000})
-        if request.url.path == "/api/subscriptions/user_to_delete":
-            return httpx.Response(204)
+        if request.url.path == "/api/subscriptions":
+            data = json.loads(request.content)
+            assert data["usernames"] == ["user_to_delete"]
+            return httpx.Response(200, json={"message": "Subscriptions deleted successfully"})
         return httpx.Response(404)
 
     transport = httpx.MockTransport(handler)

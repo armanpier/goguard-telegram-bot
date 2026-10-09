@@ -445,6 +445,13 @@ def sanitize_and_patch_env(existing: dict) -> dict:
     if existing.get("DATABASE_URL") in ("sqlite+aiosqlite:///bot.db", "sqlite+aiosqlite://bot.db"):
         existing["DATABASE_URL"] = "sqlite+aiosqlite:////app/data/bot.db"
 
+    # Ensure GoGuard default services
+    services_val = existing.get("GOGUARD_DEFAULT_SERVICES", "[1]")
+    if not str(services_val).startswith("["):
+        parts = [p.strip() for p in str(services_val).replace("'", "").replace('"', '').split(",") if p.strip()]
+        services_val = "[" + ", ".join(parts) + "]" if parts else "[1]"
+    existing["GOGUARD_DEFAULT_SERVICES"] = str(services_val)
+
     # Ensure WebUI variables
     if "WEB_ENABLE" not in existing:
         existing["WEB_ENABLE"] = "true"
@@ -731,6 +738,15 @@ def main():
         required=False,
     )
 
+    default_services = prompt_input(
+        "Enter GoGuard Default Service IDs (e.g. [1])",
+        default=existing.get("GOGUARD_DEFAULT_SERVICES", "[1]"),
+        required=False,
+    )
+    if not default_services.startswith("["):
+        parts = [p.strip() for p in default_services.replace("'", "").replace('"', '').split(",") if p.strip()]
+        default_services = "[" + ", ".join(parts) + "]" if parts else "[1]"
+
     # =========================================================================
     # Step 3: Payment & Bank Card Details
     # =========================================================================
@@ -832,6 +848,7 @@ GOGUARD_USERNAME={username}
 GOGUARD_PASSWORD={password}
 GOGUARD_SUB_URL_TEMPLATE={sub_template}
 GOGUARD_TIMEOUT_SECONDS=15
+GOGUARD_DEFAULT_SERVICES={default_services}
 
 # ==========================================
 # Database Configuration

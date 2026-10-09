@@ -81,3 +81,19 @@ def test_admin_ids_parsing():
     # Test list directly
     s4 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", ADMIN_IDS=[111, 222])
     assert s4.ADMIN_IDS == [111, 222]
+
+
+def test_goguard_default_services_parsing():
+    """Verify GOGUARD_DEFAULT_SERVICES parses various inputs into list of ints."""
+    from app.config import Settings
+    s1 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", GOGUARD_DEFAULT_SERVICES="[1, 4]")
+    assert s1.GOGUARD_DEFAULT_SERVICES == [1, 4]
+
+    s2 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", GOGUARD_DEFAULT_SERVICES="1, 7")
+    assert s2.GOGUARD_DEFAULT_SERVICES == [1, 7]
+
+    s3 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", GOGUARD_DEFAULT_SERVICES="1")
+    assert s3.GOGUARD_DEFAULT_SERVICES == [1]
+
+    s4 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", GOGUARD_DEFAULT_SERVICES=[1, 6])
+    assert s4.GOGUARD_DEFAULT_SERVICES == [1, 6]

@@ -2,8 +2,9 @@ import asyncio
 import datetime
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import httpx
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -256,6 +257,20 @@ class GoGuardClient:
     # Subscription Endpoints
     # =========================================================================
 
+    async def get_services(self) -> List[Dict[str, Any]]:
+        """
+        Fetch list of available panel services from GET /api/services.
+        """
+        try:
+            res = await self._request("GET", "/api/services")
+            if isinstance(res, dict) and "items" in res:
+                return res["items"]
+            elif isinstance(res, list):
+                return res
+        except Exception as exc:
+            logger.warning(f"Failed to fetch GoGuard services: {exc}")
+        return []
+
     async def create_subscription(
         self,
         username: str,
@@ -263,39 +278,64 @@ class GoGuardClient:
         expire: int,
         status: str = "active",
         note: str = "",
+        services: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
         """
         Create a new subscription via POST /api/subscriptions.
 
-        Payload schema (apiModels.CreateSubcriptionRequest):
-        {
-          "username": "string",
-          "data_limit": 0,       // in BYTES (e.g. 10 GB = 10 * 1024^3)
-          "expire": 0,           // Epoch Unix timestamp in seconds
-          "status": "active",
-          "note": "string"
-        }
+        Includes required 'services' field (e.g. [1]) as required by GoGuard/GuardCore panel.
         """
+        service_ids = services if services is not None else settings.GOGUARD_DEFAULT_SERVICES
+        if isinstance(service_ids, int):
+            service_ids = [service_ids]
+        elif isinstance(service_ids, str):
+            service_ids = [int(s.strip()) for s in service_ids.replace("[", "").replace("]", "").split(",") if s.strip()]
+        elif not service_ids:
+            service_ids = [1]
+
+        clean_services = [int(s) for s in service_ids]
+
         payload = {
             "username": username,
             "data_limit": int(data_limit),
             "expire": int(expire),
+            "limit_usage": int(data_limit),
+            "limit_expire": int(expire),
+            "services": clean_services,
+            "service_ids": clean_services,
             "status": status,
             "note": note,
         }
         logger.info(
             f"Creating GoGuard subscription for '{username}': "
-            f"data_limit={data_limit} bytes ({data_limit / (1024**3):.2f} GB), expire={expire}"
+            f"data_limit={data_limit} bytes ({data_limit / (1024**3):.2f} GB), expire={expire}, services={clean_services}"
         )
         result = await self._request("POST", "/api/subscriptions", json_data=payload)
+        if isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict):
+            return result[0]
         return result if isinstance(result, dict) else {"response": result}
 
     async def get_subscription(self, username: str) -> Dict[str, Any]:
         """
-        Get subscription details via GET /api/subscriptions/{username}.
+        Get subscription details via search query on GET /api/subscriptions or /api/subscriptions/{username}.
         """
-        result = await self._request("GET", f"/api/subscriptions/{username}")
-        return result if isinstance(result, dict) else {}
+        try:
+            res = await self._request("GET", "/api/subscriptions", params={"search": username})
+            if isinstance(res, dict) and "items" in res:
+                for item in res["items"]:
+                    if item.get("username") == username:
+                        return item
+        except Exception as exc:
+            logger.debug(f"Search query failed: {exc}")
+
+        try:
+            result = await self._request("GET", f"/api/subscriptions/{username}")
+            if isinstance(result, dict) and "username" in result:
+                return result
+        except Exception:
+            pass
+
+        return {}
 
     async def update_subscription(
         self,
@@ -304,6 +344,7 @@ class GoGuardClient:
         expire: Optional[int] = None,
         status: Optional[str] = None,
         note: Optional[str] = None,
+        services: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
         """
         Update an existing subscription via PUT /api/subscriptions/{username}.
@@ -311,12 +352,17 @@ class GoGuardClient:
         payload: Dict[str, Any] = {}
         if data_limit is not None:
             payload["data_limit"] = int(data_limit)
+            payload["limit_usage"] = int(data_limit)
         if expire is not None:
             payload["expire"] = int(expire)
+            payload["limit_expire"] = int(expire)
         if status is not None:
             payload["status"] = status
         if note is not None:
             payload["note"] = note
+        if services is not None:
+            payload["services"] = [int(s) for s in services]
+            payload["service_ids"] = [int(s) for s in services]
 
         result = await self._request("PUT", f"/api/subscriptions/{username}", json_data=payload)
         return result if isinstance(result, dict) else {}
@@ -330,22 +376,27 @@ class GoGuardClient:
 
     async def delete_subscription(self, username: str) -> bool:
         """
-        Delete a subscription via DELETE /api/subscriptions/{username}.
+        Delete a subscription via DELETE /api/subscriptions with {"usernames": [username]}.
         """
         try:
-            await self._request("DELETE", f"/api/subscriptions/{username}")
+            await self._request("DELETE", "/api/subscriptions", json_data={"usernames": [username]})
             return True
-        except GoGuardNotFoundError:
-            return True
+        except Exception:
+            try:
+                await self._request("DELETE", f"/api/subscriptions/{username}")
+                return True
+            except Exception as exc:
+                logger.warning(f"Failed to delete subscription '{username}': {exc}")
+                return False
 
     def get_subscription_url(self, username: str, api_response: Optional[Dict[str, Any]] = None) -> str:
         """
         Resolve the subscription URL:
-        1. Checks if api_response contains 'subscription_url', 'sub_url', or 'link'.
+        1. Checks if api_response contains 'subscription_link', 'subscription_url', 'sub_url', or 'link'.
         2. Falls back to formatting sub_url_template with base_url and username.
         """
         if api_response and isinstance(api_response, dict):
-            for key in ("subscription_url", "sub_url", "link", "url"):
+            for key in ("subscription_link", "subscription_url", "sub_url", "link", "url"):
                 val = api_response.get(key)
                 if val and isinstance(val, str) and val.startswith("http"):
                     return val

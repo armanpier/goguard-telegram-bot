@@ -26,6 +26,10 @@ class Settings(BaseSettings):
         description="Template for building subscription URLs if not returned by API"
     )
     GOGUARD_TIMEOUT_SECONDS: float = Field(default=15.0, description="HTTP request timeout in seconds")
+    GOGUARD_DEFAULT_SERVICES: Any = Field(
+        default_factory=lambda: [1],
+        description="Default GoGuard service IDs assigned to new subscriptions"
+    )
 
     # Database
     DATABASE_URL: str = Field(default="sqlite+aiosqlite:///bot.db", description="SQLAlchemy database connection URL")
@@ -76,6 +80,28 @@ class Settings(BaseSettings):
             )
             return [int(item.strip()) for item in cleaned.split(",") if item.strip()]
         return []
+
+    @field_validator("GOGUARD_DEFAULT_SERVICES", mode="before")
+    @classmethod
+    def parse_default_services(cls, v: Any) -> List[int]:
+        if isinstance(v, list):
+            return [int(item) for item in v]
+        if isinstance(v, int):
+            return [v]
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return [1]
+            cleaned = (
+                v.replace("[", "")
+                .replace("]", "")
+                .replace('"', "")
+                .replace("'", "")
+                .replace("\n", "")
+            )
+            parsed = [int(item.strip()) for item in cleaned.split(",") if item.strip()]
+            return parsed if parsed else [1]
+        return [1]
 
     @field_validator("GOGUARD_BASE_URL", mode="after")
     @classmethod
