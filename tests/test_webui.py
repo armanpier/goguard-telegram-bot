@@ -116,3 +116,78 @@ async def test_webui_login_and_force_password_change():
         # 8. Reset back to admin for standard test isolation
         async with async_session_factory() as session:
             await set_web_password(session, "admin")
+
+
+@pytest.mark.asyncio
+async def test_webui_pages_with_data_relationships():
+    """Verify that dashboard, receipts, and subscriptions render without DetachedInstanceError."""
+    import random
+    from app.database.models import User, Plan, Subscription, PaymentReceipt
+
+    uid = random.randint(10000000, 99999999)
+
+    async with async_session_factory() as session:
+        # Set non-default password so require_auth allows dashboard access
+        await set_web_password(session, "SecurePassword123")
+
+        # Create User
+        test_user = User(id=uid, username=f"user_{uid}", full_name="تستر سیستم", balance=50000)
+        session.add(test_user)
+
+        # Create Plan
+        test_plan = Plan(title="پلن تست ۱ ماهه", traffic_gb=20.0, duration_days=30, price=120000)
+        session.add(test_plan)
+        await session.flush()
+
+        # Create Receipt
+        test_receipt = PaymentReceipt(
+            user_id=test_user.id,
+            plan_id=test_plan.id,
+            amount=120000,
+            payment_type="plan_purchase",
+            photo_file_id="test_photo_id",
+            status="pending",
+        )
+        session.add(test_receipt)
+
+        # Create Subscription
+        test_sub = Subscription(
+            user_id=test_user.id,
+            plan_id=test_plan.id,
+            goguard_username=f"u{uid}",
+            data_limit_bytes=20 * 1024 * 1024 * 1024,
+            expire_timestamp=1750000000,
+            sub_url="https://sub.example.com/test",
+            status="active",
+        )
+        session.add(test_sub)
+        await session.commit()
+
+    mock_bot = AsyncMock()
+    mock_goguard = AsyncMock()
+    mock_goguard.health_check = AsyncMock(return_value=True)
+    app = create_web_app(mock_bot, mock_goguard)
+
+    token = create_session_token("admin")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", cookies={"admin_session": token}) as client:
+        # 1. Dashboard
+        resp_dash = await client.get("/dashboard")
+        assert resp_dash.status_code == 200
+        assert "تستر سیستم" in resp_dash.text
+        assert "پلن تست ۱ ماهه" in resp_dash.text
+
+        # 2. Receipts page
+        resp_rec = await client.get("/receipts")
+        assert resp_rec.status_code == 200
+        assert "تستر سیستم" in resp_rec.text
+        assert f"@user_{uid}" in resp_rec.text
+        assert "پلن تست ۱ ماهه" in resp_rec.text
+
+        # 3. Subscriptions page
+        resp_subs = await client.get("/subscriptions")
+        assert resp_subs.status_code == 200
+        assert f"u{uid}" in resp_subs.text
+        assert "تستر سیستم" in resp_subs.text
+        assert "پلن تست ۱ ماهه" in resp_subs.text
+

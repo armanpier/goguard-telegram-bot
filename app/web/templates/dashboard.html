@@ -103,8 +103,8 @@
                     <tr class="hover:bg-gray-50/70 transition">
                         <td class="px-6 py-3.5 font-mono text-gray-500">#{{ rec.id }}</td>
                         <td class="px-6 py-3.5 font-medium text-gray-900">
-                            {{ rec.user.full_name or 'کاربر' }}
-                            {% if rec.user.username %}<span class="text-gray-400">(@{{ rec.user.username }})</span>{% endif %}
+                            {{ (rec.user.full_name or 'کاربر') if rec.user else 'کاربر' }}
+                            {% if rec.user and rec.user.username %}<span class="text-gray-400">(@{{ rec.user.username }})</span>{% endif %}
                         </td>
                         <td class="px-6 py-3.5 font-bold text-gray-900">{{ rec.amount | format_price }}</td>
                         <td class="px-6 py-3.5">

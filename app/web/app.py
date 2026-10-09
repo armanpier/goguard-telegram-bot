@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, Response, Form, Depends, HTTPException, st
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 from aiogram import Bot
 
 from app.config import settings
@@ -236,6 +237,7 @@ def create_web_app(bot: Bot, goguard: GoGuardClient) -> FastAPI:
             # Recent receipts
             rec_stmt = (
                 select(PaymentReceipt)
+                .options(selectinload(PaymentReceipt.user), selectinload(PaymentReceipt.plan))
                 .order_by(desc(PaymentReceipt.id))
                 .limit(5)
             )
@@ -367,7 +369,11 @@ def create_web_app(bot: Bot, goguard: GoGuardClient) -> FastAPI:
         user: str = Depends(require_auth),
     ):
         async with async_session_factory() as session:
-            query = select(PaymentReceipt).order_by(desc(PaymentReceipt.id))
+            query = (
+                select(PaymentReceipt)
+                .options(selectinload(PaymentReceipt.user), selectinload(PaymentReceipt.plan))
+                .order_by(desc(PaymentReceipt.id))
+            )
             if status:
                 query = query.where(PaymentReceipt.status == status)
 
@@ -521,7 +527,9 @@ def create_web_app(bot: Bot, goguard: GoGuardClient) -> FastAPI:
     ):
         async with async_session_factory() as session:
             subs = (await session.execute(
-                select(Subscription).order_by(desc(Subscription.id))
+                select(Subscription)
+                .options(selectinload(Subscription.user), selectinload(Subscription.plan))
+                .order_by(desc(Subscription.id))
             )).scalars().all()
 
         return templates.TemplateResponse(

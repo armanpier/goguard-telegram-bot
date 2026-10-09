@@ -50,8 +50,8 @@
                     <tr class="hover:bg-gray-50/70 transition">
                         <td class="px-6 py-3.5 font-mono text-gray-500">#{{ rec.id }}</td>
                         <td class="px-6 py-3.5">
-                            <div class="font-bold text-gray-900">{{ rec.user.full_name or 'کاربر' }}</div>
-                            <div class="text-[11px] text-gray-400 font-mono">ID: {{ rec.user_id }} {% if rec.user.username %}(@{{ rec.user.username }}){% endif %}</div>
+                            <div class="font-bold text-gray-900">{{ (rec.user.full_name or 'کاربر') if rec.user else 'کاربر' }}</div>
+                            <div class="text-[11px] text-gray-400 font-mono">ID: {{ rec.user_id }} {% if rec.user and rec.user.username %}(@{{ rec.user.username }}){% endif %}</div>
                         </td>
                         <td class="px-6 py-3.5 font-bold text-gray-900">{{ rec.amount | format_price }}</td>
                         <td class="px-6 py-3.5">

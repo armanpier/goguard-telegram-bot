@@ -38,7 +38,7 @@
                     <tr class="hover:bg-gray-50/70 transition">
                         <td class="px-6 py-3.5 font-mono font-bold text-blue-600">{{ sub.goguard_username }}</td>
                         <td class="px-6 py-3.5">
-                            <div class="font-medium text-gray-900">{{ sub.user.full_name or 'کاربر' }}</div>
+                            <div class="font-medium text-gray-900">{{ (sub.user.full_name or 'کاربر') if sub.user else 'کاربر' }}</div>
                             <div class="text-[11px] text-gray-400 font-mono">TG ID: {{ sub.user_id }}</div>
                         </td>
                         <td class="px-6 py-3.5">
