@@ -239,10 +239,11 @@ def create_web_app(bot: Bot, goguard: GoGuardClient) -> FastAPI:
                 select(func.count(PaymentReceipt.id)).where(PaymentReceipt.status == "pending")
             )).scalar() or 0
 
-            # Recent receipts
+            # Pending receipts preview on dashboard
             rec_stmt = (
                 select(PaymentReceipt)
                 .options(selectinload(PaymentReceipt.user), selectinload(PaymentReceipt.plan))
+                .where(PaymentReceipt.status == "pending")
                 .order_by(desc(PaymentReceipt.id))
                 .limit(5)
             )

@@ -191,3 +191,48 @@ async def test_webui_pages_with_data_relationships():
         assert "تستر سیستم" in resp_subs.text
         assert "پلن تست ۱ ماهه" in resp_subs.text
 
+
+@pytest.mark.asyncio
+async def test_dashboard_approved_receipt_not_in_pending_table():
+    import random
+    from app.database.models import User, Plan, PaymentReceipt
+
+    uid = random.randint(10000000, 99999999)
+
+    async with async_session_factory() as session:
+        await set_web_password(session, "SecurePassword123")
+
+        test_user = User(id=uid, username=f"user_{uid}", full_name="کاربر تایید شده", balance=0)
+        session.add(test_user)
+
+        test_plan = Plan(title="پلن تست ۱", traffic_gb=10.0, duration_days=30, price=50000)
+        session.add(test_plan)
+        await session.flush()
+
+        test_receipt = PaymentReceipt(
+            user_id=test_user.id,
+            plan_id=test_plan.id,
+            amount=50000,
+            payment_type="plan_purchase",
+            photo_file_id="test_photo_id",
+            status="approved",
+        )
+        session.add(test_receipt)
+        await session.commit()
+
+    mock_bot = AsyncMock()
+    mock_goguard = AsyncMock()
+    mock_goguard.health_check = AsyncMock(return_value=True)
+    app = create_web_app(mock_bot, mock_goguard)
+
+    token = create_session_token("admin")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", cookies={"admin_session": token}) as client:
+        resp_dash = await client.get("/dashboard")
+        assert resp_dash.status_code == 200
+        # The approved receipt should NOT be listed in the pending receipts table
+        assert f"#{test_receipt.id}" not in resp_dash.text
+        assert f"/receipts/{test_receipt.id}/approve" not in resp_dash.text
+        assert "کاربر تایید شده" not in resp_dash.text
+
+
