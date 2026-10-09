@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # Telegram Bot
     BOT_TOKEN: str = Field(default="", description="Telegram Bot Token from @BotFather")
-    ADMIN_IDS: Union[List[int], str, int] = Field(default_factory=list, description="Telegram User IDs with admin access")
+    ADMIN_IDS: Any = Field(default_factory=list, description="Telegram User IDs with admin access")
     SUPPORT_USERNAME: str = Field(default="@vpn_support", description="Support contact username")
     REQUIRED_CHANNEL_ID: Optional[str] = Field(default=None, description="Mandatory channel ID or username (e.g. @channel)")
 
@@ -67,14 +67,13 @@ class Settings(BaseSettings):
             v = v.strip()
             if not v:
                 return []
-            if v.startswith("[") and v.endswith("]"):
-                try:
-                    parsed = json.loads(v)
-                    if isinstance(parsed, list):
-                        return [int(item) for item in parsed]
-                except Exception:
-                    pass
-            cleaned = v.replace("[", "").replace("]", "")
+            cleaned = (
+                v.replace("[", "")
+                .replace("]", "")
+                .replace('"', "")
+                .replace("'", "")
+                .replace("\n", "")
+            )
             return [int(item.strip()) for item in cleaned.split(",") if item.strip()]
         return []
 
