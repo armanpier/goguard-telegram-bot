@@ -353,20 +353,26 @@ def main():
                 break
 
     # Admin IDs
-    admin_ids_str = ""
+    admin_ids_formatted = "[]"
     while True:
-        admin_ids_str = prompt_input(
+        default_admin = (
+            existing.get("ADMIN_IDS", "")
+            .replace("[", "")
+            .replace("]", "")
+            .replace(" ", "")
+        )
+        raw_admin_input = prompt_input(
             "Enter ADMIN_IDS (comma-separated Telegram User IDs, e.g. 123456789,987654321)",
-            default=existing.get("ADMIN_IDS", ""),
+            default=default_admin,
             required=True,
         )
-        # Validate format
-        parts = [p.strip() for p in admin_ids_str.split(",") if p.strip()]
+        cleaned_input = raw_admin_input.replace("[", "").replace("]", "")
+        parts = [p.strip() for p in cleaned_input.split(",") if p.strip()]
         if not parts or not all(p.lstrip("-").isdigit() for p in parts):
             print(f"{RED}⚠️ Invalid format. Please enter numeric user IDs separated by commas.{RESET}")
             continue
-        admin_ids_str = ",".join(parts)
-        print(f"{GREEN}✓ Configured {len(parts)} admin ID(s): {admin_ids_str}{RESET}")
+        admin_ids_formatted = "[" + ", ".join(parts) + "]"
+        print(f"{GREEN}✓ Configured {len(parts)} admin ID(s): {admin_ids_formatted}{RESET}")
         break
 
     # Support Username
@@ -503,7 +509,7 @@ def main():
 # Telegram Bot Configuration
 # ==========================================
 BOT_TOKEN={bot_token}
-ADMIN_IDS={admin_ids_str}
+ADMIN_IDS={admin_ids_formatted}
 SUPPORT_USERNAME={support_username}
 REQUIRED_CHANNEL_ID={required_channel}
 

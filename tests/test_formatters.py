@@ -62,3 +62,22 @@ def test_format_timestamp():
     formatted = format_timestamp(epoch, include_time=True)
     assert len(formatted) > 5
     assert "/" in formatted
+
+
+def test_admin_ids_parsing():
+    from app.config import Settings
+    # Test JSON array
+    s1 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", ADMIN_IDS="[123, 456]")
+    assert s1.ADMIN_IDS == [123, 456]
+
+    # Test comma-separated string
+    s2 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", ADMIN_IDS="123,456")
+    assert s2.ADMIN_IDS == [123, 456]
+
+    # Test single int string
+    s3 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", ADMIN_IDS="999")
+    assert s3.ADMIN_IDS == [999]
+
+    # Test list directly
+    s4 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", ADMIN_IDS=[111, 222])
+    assert s4.ADMIN_IDS == [111, 222]

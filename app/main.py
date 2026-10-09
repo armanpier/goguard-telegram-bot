@@ -41,6 +41,10 @@ async def main() -> None:
     """Main application entry point."""
     logger.info("Initializing GoGuard Telegram Bot...")
 
+    if not settings.BOT_TOKEN:
+        logger.critical("BOT_TOKEN is not configured! Please configure your .env file or run python setup.py")
+        sys.exit(1)
+
     # 1. Initialize Database
     try:
         await init_db()
