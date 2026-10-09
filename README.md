@@ -141,12 +141,39 @@ goguard-telegram-bot/
 
 ## 🚀 Quick Start Guide
 
-### Method 1: Docker Compose (Recommended)
+### ⚡ Method 1: Interactive Installation Wizard (Recommended)
+
+Simply run the interactive installer which prompts for your **Telegram Bot Token**, **Admin Telegram IDs**, **GoGuard Panel URL & Credentials** (with real-time API connection validation), and writes your `.env` automatically:
+
+#### On Linux VPS:
+```bash
+git clone https://github.com/armanpier/goguard-telegram-bot.git
+cd goguard-telegram-bot
+bash install.sh
+```
+
+#### On Windows / Any Platform:
+```bash
+git clone https://github.com/armanpier/goguard-telegram-bot.git
+cd goguard-telegram-bot
+python setup.py
+```
+
+The wizard will:
+1. Validate your **Telegram Bot Token** in real-time against `api.telegram.org`.
+2. Format and validate your **Admin Telegram IDs**.
+3. Authenticate with your **GoGuard Panel API 1.0** live (`POST /api/admins/token`) to verify connection.
+4. Prompt for bank card details, free trial options, and referral settings.
+5. Generate your production `.env` and offer to launch via Docker Compose or Python!
+
+---
+
+### 🐳 Method 2: Manual Docker Compose
 
 1. **Clone the repository:**
    ```bash
-   git clone <REPO_URL>
-   cd <REPO_DIRECTORY>
+   git clone https://github.com/armanpier/goguard-telegram-bot.git
+   cd goguard-telegram-bot
    ```
 
 2. **Configure environment:**
@@ -157,6 +184,7 @@ goguard-telegram-bot/
    Fill in your `BOT_TOKEN`, `ADMIN_IDS`, `GOGUARD_BASE_URL`, `GOGUARD_USERNAME`, and `GOGUARD_PASSWORD`.
 
 3. **Start the bot container:**
+
    ```bash
    docker compose up -d --build
    ```

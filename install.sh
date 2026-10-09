@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# GoGuard Telegram Bot - 1-Click Interactive VPS Installer
+# ==============================================================================
+
+set -e
+
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${CYAN}==================================================================${NC}"
+echo -e "${CYAN}        🚀 GoGuard Telegram Bot - Linux VPS Installer             ${NC}"
+echo -e "${CYAN}==================================================================${NC}"
+
+# Check root privileges
+if [ "$EUID" -ne 0 ]; then
+  echo -e "${YELLOW}Warning: Running without root privileges. Some package installations may fail.${NC}"
+fi
+
+# Detect package manager and install requirements
+echo -e "\n${CYAN}[1/4] Checking system dependencies (Python 3.11+, Git, Curl)...${NC}"
+if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y
+    apt-get install -y python3 python3-pip python3-venv git curl
+elif command -v yum >/dev/null 2>&1; then
+    yum install -y python3 python3-pip git curl
+elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y python3 python3-pip git curl
+fi
+
+# Set up virtual environment if not already present
+echo -e "\n${CYAN}[2/4] Setting up Python virtual environment...${NC}"
+if [ ! -d ".venv" ]; then
+    python3 -m venv .venv
+fi
+
+# Activate virtual environment
+source .venv/bin/activate
+
+echo -e "\n${CYAN}[3/4] Installing Python requirements...${NC}"
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Run interactive configuration wizard
+echo -e "\n${CYAN}[4/4] Launching Interactive Setup Wizard...${NC}"
+python3 setup.py
+
+echo -e "\n${GREEN}Installation script finished!${NC}"
