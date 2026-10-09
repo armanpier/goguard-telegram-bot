@@ -17,6 +17,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+# Always execute inside the repository folder
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR and os.getcwd() != SCRIPT_DIR:
+    try:
+        os.chdir(SCRIPT_DIR)
+    except Exception:
+        pass
+
 
 # ANSI Color Codes
 CYAN = "\033[96m"
@@ -323,7 +331,8 @@ def load_existing_env() -> dict[str, str]:
 
 def detect_installation_state() -> dict:
     """Inspect system to determine if GoGuard Bot was previously installed and how."""
-    has_env = os.path.exists(".env")
+    existing = load_existing_env()
+    has_env = (os.path.exists(".env") and os.path.getsize(".env") > 0) or len(existing) > 0
     has_data_db = os.path.exists("data/bot.db")
     has_root_db = os.path.exists("bot.db")
     has_db = has_data_db or has_root_db
@@ -340,15 +349,15 @@ def detect_installation_state() -> dict:
     if is_command_available("docker"):
         try:
             res = subprocess.run(
-                'docker ps -a --filter "name=goguard_telegram_bot" --format "{{.Names}}|{{.Status}}"',
+                'docker ps -a --filter "name=goguard" --format "{{.Names}}|{{.Status}}"',
                 shell=True,
                 capture_output=True,
                 text=True,
             )
             out = res.stdout.strip()
-            if "goguard_telegram_bot" in out:
+            if "goguard" in out:
                 docker_container = out
-                docker_running = "Up" in out
+                docker_running = "up" in out.lower() or "running" in out.lower()
         except Exception:
             pass
 
@@ -375,13 +384,15 @@ def detect_installation_state() -> dict:
     elif systemd_service:
         mode_str = f"Systemd Service ({'Active ✅' if systemd_active else 'Inactive ⏹️'})"
     elif has_env and has_db:
-        mode_str = "Python Standalone (Files Present)"
+        mode_str = "Docker / Python Standalone (.env & Database Present)"
+    elif has_db:
+        mode_str = "Existing Database Found (data/bot.db)"
     elif has_env:
-        mode_str = "Partially Configured (.env Present)"
+        mode_str = "Existing Configuration Found (.env Present)"
     else:
         mode_str = "None (Fresh Installation)"
 
-    is_installed = has_env or has_db or docker_container is not None or systemd_service
+    is_installed = has_env or has_db or docker_container is not None or systemd_service or len(existing) > 0
 
     return {
         "is_installed": is_installed,

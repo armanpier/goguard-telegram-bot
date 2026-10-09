@@ -20,7 +20,16 @@ if [ "$EUID" -ne 0 ]; then
   echo -e "${YELLOW}Warning: Running without root privileges. Some package installations may fail.${NC}"
 fi
 
-# Locate or clone project directory
+# Ensure standard input is connected to terminal for interactive prompts (handles curl | bash)
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+    exec < /dev/tty
+fi
+
+# Ensure running from script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Locate or clone project directory if not already inside repo
 INSTALL_DIR="$HOME/goguard-telegram-bot"
 REPO_URL="https://github.com/armanpier/goguard-telegram-bot.git"
 
@@ -35,11 +44,15 @@ if [ ! -f "setup.py" ]; then
     fi
 fi
 
-# Pull latest commits if inside git worktree
-if [ -d ".git" ]; then
+# Pull latest commits and self-restart to ensure latest version of install.sh and setup.py run
+if [ -d ".git" ] && [ -z "$GOGUARD_UPDATER_ACTIVE" ]; then
+    export GOGUARD_UPDATER_ACTIVE=1
     echo -e "${CYAN}🔄 Syncing latest updates from GitHub...${NC}"
     git stash >/dev/null 2>&1 || true
-    git pull origin main || true
+    if git pull origin main; then
+        echo -e "${GREEN}✓ Successfully updated from GitHub! Restarting installer...${NC}\n"
+        exec bash "$0" "$@"
+    fi
 fi
 
 # Detect package manager and install requirements
