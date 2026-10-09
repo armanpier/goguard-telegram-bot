@@ -8,7 +8,9 @@ from app.config import settings
 from app.database.models import User, Plan, PaymentReceipt, Subscription
 from app.services.goguard import GoGuardClient
 from app.services.subscription import create_user_subscription
+from app.services.qr import generate_qr_code_file
 from app.bot.keyboards.admin import get_receipt_review_keyboard
+from app.bot.keyboards.inline import get_subscription_delivered_keyboard
 from app.bot.utils.texts import (
     get_receipt_admin_alert_text,
     get_subscription_delivered_text,
@@ -132,16 +134,23 @@ async def process_receipt_approval(
             sub_url=sub_url,
             is_trial=False,
         )
+        kb = get_subscription_delivered_keyboard(sub_url)
         try:
             await bot.send_photo(
                 chat_id=user.id,
                 photo=qr_file,
                 caption=delivery_text,
+                reply_markup=kb,
             )
         except Exception as exc:
-            logger.error(f"Failed to send subscription photo to user {user.id}: {exc}")
-            # Try text only fallback
-            await bot.send_message(chat_id=user.id, text=delivery_text)
+            logger.error(f"Failed to send subscription photo with caption to user {user.id}: {exc}")
+            # Ensure QR code image is still delivered even if caption failed
+            try:
+                fresh_qr = generate_qr_code_file(sub_url)
+                await bot.send_photo(chat_id=user.id, photo=fresh_qr, caption="📱 تصویر QR Code اشتراک شما")
+            except Exception as e2:
+                logger.error(f"Failed to send fallback QR photo: {e2}")
+            await bot.send_message(chat_id=user.id, text=delivery_text, reply_markup=kb)
 
         # Handle Referral Commission
         if settings.REFERRAL_ENABLED and user.referrer_id:

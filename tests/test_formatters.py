@@ -97,3 +97,28 @@ def test_goguard_default_services_parsing():
 
     s4 = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", GOGUARD_DEFAULT_SERVICES=[1, 6])
     assert s4.GOGUARD_DEFAULT_SERVICES == [1, 6]
+
+
+def test_subscription_delivered_text_clean_url():
+    """Verify subscription delivery text uses clean preformatted code block without trailing backticks."""
+    from app.bot.utils.texts import get_subscription_delivered_text
+    raw_url = "https://versub.bertly.top/guards/93257d73706bde86c3806fe1398963e2`"
+    text = get_subscription_delivered_text("Test Plan", 10.0, 1800000000, raw_url)
+    expected_clean = "https://versub.bertly.top/guards/93257d73706bde86c3806fe1398963e2"
+    assert f"```\n{expected_clean}\n```" in text
+    assert "%60" not in text
+    assert "`https" not in text  # Not inline backtick
+
+
+def test_subscription_delivered_keyboard_clean_url():
+    """Verify subscription keyboards create direct clean link without trailing backticks."""
+    from app.bot.keyboards.inline import get_subscription_delivered_keyboard, get_subscription_actions_keyboard
+    raw_url = "https://versub.bertly.top/guards/93257d73706bde86c3806fe1398963e2`"
+    expected_clean = "https://versub.bertly.top/guards/93257d73706bde86c3806fe1398963e2"
+
+    kb1 = get_subscription_delivered_keyboard(raw_url)
+    assert kb1.inline_keyboard[0][0].url == expected_clean
+
+    kb2 = get_subscription_actions_keyboard(1, raw_url)
+    assert kb2.inline_keyboard[0][0].url == expected_clean
+

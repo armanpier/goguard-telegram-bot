@@ -20,6 +20,7 @@ from app.bot.keyboards.inline import (
     get_plan_payment_methods_keyboard,
     get_my_subscriptions_keyboard,
     get_subscription_actions_keyboard,
+    get_subscription_delivered_keyboard,
     get_topup_presets_keyboard,
 )
 from app.bot.utils.texts import (
@@ -143,9 +144,23 @@ async def callback_pay_with_wallet(
             sub_url=sub_url,
             is_trial=False,
         )
+        kb = get_subscription_delivered_keyboard(sub_url)
 
         await callback.message.delete()
-        await callback.message.answer_photo(photo=qr_file, caption=delivery_text)
+        try:
+            await callback.message.answer_photo(
+                photo=qr_file,
+                caption=delivery_text,
+                reply_markup=kb,
+            )
+        except Exception as exc:
+            logger.error(f"Failed to answer_photo in wallet buy: {exc}")
+            try:
+                fresh_qr = generate_qr_code_file(sub_url)
+                await callback.message.answer_photo(photo=fresh_qr, caption="📱 تصویر QR Code اشتراک شما")
+            except Exception as e2:
+                logger.error(f"Failed to send standalone QR photo: {e2}")
+            await callback.message.answer(delivery_text, reply_markup=kb)
 
     except Exception as exc:
         logger.error(f"Error provisioning subscription via wallet: {exc}")
@@ -314,13 +329,17 @@ async def callback_sub_qr(callback: CallbackQuery, session: AsyncSession, db_use
         await callback.answer("اشتراک یافت نشد.", show_alert=True)
         return
 
-    qr_file = generate_qr_code_file(sub.sub_url, filename=f"{sub.goguard_username}_qr.png")
+    clean_url = str(sub.sub_url).strip().strip("`'\"")
+    qr_file = generate_qr_code_file(clean_url, filename=f"{sub.goguard_username}_qr.png")
     caption = (
-        f"📱 **QR Code اشتراک: {sub.goguard_username}**\n\n"
+        f"📱 *QR Code اشتراک: {sub.goguard_username}*\n\n"
         f"برای اسکن مستقیم در نرم‌افزارهای V2RayNG یا Streisand استفاده کنید.\n\n"
-        f"🔗 لینک مستقیم:\n`{sub.sub_url}`"
+        f"🔗 *لینک مستقیم (جهت کپی روی متن لمس کنید):*\n```\n{clean_url}\n```"
     )
-    await callback.message.answer_photo(photo=qr_file, caption=caption)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🌐 باز کردن پنل کاربری اشتراک", url=clean_url)]
+    ])
+    await callback.message.answer_photo(photo=qr_file, caption=caption, reply_markup=kb)
     await callback.answer()
 
 
@@ -382,9 +401,23 @@ async def handle_free_trial(
             sub_url=sub_url,
             is_trial=True,
         )
+        kb = get_subscription_delivered_keyboard(sub_url)
 
         await wait_msg.delete()
-        await message.answer_photo(photo=qr_file, caption=delivery_text)
+        try:
+            await message.answer_photo(
+                photo=qr_file,
+                caption=delivery_text,
+                reply_markup=kb,
+            )
+        except Exception as exc:
+            logger.error(f"Failed to answer_photo in free trial: {exc}")
+            try:
+                fresh_qr = generate_qr_code_file(sub_url)
+                await message.answer_photo(photo=fresh_qr, caption="📱 تصویر QR Code اشتراک شما")
+            except Exception as e2:
+                logger.error(f"Failed to send standalone QR photo in trial: {e2}")
+            await message.answer(delivery_text, reply_markup=kb)
 
     except Exception as exc:
         logger.error(f"Error provisioning free trial: {exc}")

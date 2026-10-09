@@ -63,9 +63,23 @@ def get_my_subscriptions_keyboard(subs: List[Subscription]) -> InlineKeyboardMar
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+def get_subscription_delivered_keyboard(sub_url: str) -> InlineKeyboardMarkup:
+    """Action keyboard when subscription is first delivered."""
+    clean_url = str(sub_url).strip().strip("`'\"")
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🌐 باز کردن پنل کاربری اشتراک", url=clean_url),
+        ]
+    ])
+
+
 def get_subscription_actions_keyboard(sub_id: int, sub_url: str) -> InlineKeyboardMarkup:
     """Actions for a specific subscription."""
+    clean_url = str(sub_url).strip().strip("`'\"")
     return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🌐 ورود به پنل کاربری اشتراک", url=clean_url),
+        ],
         [
             InlineKeyboardButton(text="📱 دریافت QR Code", callback_data=f"sub_qr:{sub_id}"),
             InlineKeyboardButton(text="🔄 به‌روزرسانی وضعیت", callback_data=f"refresh_sub:{sub_id}"),

@@ -399,12 +399,13 @@ class GoGuardClient:
             for key in ("subscription_link", "subscription_url", "sub_url", "link", "url"):
                 val = api_response.get(key)
                 if val and isinstance(val, str) and val.startswith("http"):
-                    return val
+                    return val.strip().strip("`'\"")
 
-        return self.sub_url_template.format(
+        raw_url = self.sub_url_template.format(
             base_url=self.base_url,
             username=username,
         )
+        return raw_url.strip().strip("`'\"")
 
     async def health_check(self) -> bool:
         """

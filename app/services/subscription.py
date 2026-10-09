@@ -55,7 +55,7 @@ async def create_user_subscription(
     )
 
     # 2. Extract or construct subscription URL
-    sub_url = goguard.get_subscription_url(goguard_username, api_response)
+    sub_url = (goguard.get_subscription_url(goguard_username, api_response) or "").strip().strip("`'\"")
 
     # 3. Create Subscription record in DB
     sub = Subscription(
@@ -117,7 +117,7 @@ async def sync_subscription_details(
 
     expire = data.get("limit_expire") or data.get("expire") or sub.expire_timestamp
     status = "active" if data.get("enabled") is True else (data.get("status") or sub.status)
-    sub_url = goguard.get_subscription_url(sub.goguard_username, data) or sub.sub_url
+    sub_url = (goguard.get_subscription_url(sub.goguard_username, data) or sub.sub_url or "").strip().strip("`'\"")
 
     # Update local DB if changed
     changed = False

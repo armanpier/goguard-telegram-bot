@@ -83,18 +83,19 @@ def get_subscription_delivered_text(
     sub_url: str,
     is_trial: bool = False,
 ) -> str:
-    header = "🎁 **سرویس تست رایگان شما فعال شد!**" if is_trial else f"🎉 **اشتراک شما ({sub_title}) با موفقیت فعال شد!**"
+    clean_url = str(sub_url).strip().strip("`'\"")
+    header = "🎁 *سرویس تست رایگان شما فعال شد!*" if is_trial else f"🎉 *اشتراک شما ({sub_title}) با موفقیت فعال شد!*"
     expire_str = format_timestamp(expire_epoch)
     remaining_str = remaining_time_human(expire_epoch)
 
     return (
         f"{header}\n\n"
-        f"📊 حجم کل: **{traffic_gb:g} گیگابایت**\n"
-        f"📅 تاریخ انقضا: **{expire_str}** ({remaining_str})\n\n"
-        f"🔗 **لینک اشتراک شما (برای کپی لمس کنید):**\n"
-        f"`{sub_url}`\n\n"
+        f"📊 حجم کل: *{traffic_gb:g} گیگابایت*\n"
+        f"📅 تاریخ انقضا: *{expire_str}* ({remaining_str})\n\n"
+        f"🔗 *لینک اشتراک شما (برای کپی روی متن لمس کنید):*\n"
+        f"```\n{clean_url}\n```\n\n"
         "📱 تصویر QR Code نیز در بالا برای اسکن سریع پیوست شده است.\n\n"
-        "💡 **نحوه استفاده:**\n"
+        "💡 *نحوه استفاده:*\n"
         "لینک فوق را کپی کرده و در برنامه‌های V2RayNG (اندروید)، FoXray / Streisand (آیفون) یا v2rayN (ویندوز) از طریق دکمه + (Add from Clipboard) وارد کنید."
     )
 
@@ -107,6 +108,7 @@ def get_subscription_status_text(
     status: str,
     sub_url: str,
 ) -> str:
+    clean_url = str(sub_url).strip().strip("`'\"")
     used_human = bytes_to_human(used_bytes)
     total_human = bytes_to_human(total_bytes)
     remaining_bytes = max(total_bytes - used_bytes, 0)
@@ -122,14 +124,14 @@ def get_subscription_status_text(
     status_icon = "🟢 فعال" if status == "active" else "🔴 غیرفعال"
 
     return (
-        f"👤 **جزئیات سرویس: {username}**\n\n"
+        f"👤 *جزئیات سرویس: {username}*\n\n"
         f"وضعیت: {status_icon}\n"
-        f"📊 ترافیک مصرفی: **{used_human}** از **{total_human}**\n"
-        f"📦 ترافیک باقی‌مانده: **{remaining_human}**\n"
+        f"📊 ترافیک مصرفی: *{used_human}* از *{total_human}*\n"
+        f"📦 ترافیک باقی‌مانده: *{remaining_human}*\n"
         f"{bar}\n\n"
-        f"⏳ انقضا: **{expire_str}**\n"
-        f"⏱ زمان باقی‌مانده: **{remaining_time}**\n\n"
-        f"🔗 لینک اشتراک:\n`{sub_url}`"
+        f"⏳ انقضا: *{expire_str}*\n"
+        f"⏱ زمان باقی‌مانده: *{remaining_time}*\n\n"
+        f"🔗 *لینک اشتراک:*\n```\n{clean_url}\n```"
     )
 
 
