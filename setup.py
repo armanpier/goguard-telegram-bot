@@ -248,6 +248,20 @@ def install_docker_on_linux() -> bool:
     return True
 
 
+def ensure_firewall_port(port: int = 8080) -> None:
+    """Ensure WebUI port is permitted through Linux host firewall (UFW / iptables)."""
+    if sys.platform.startswith("linux"):
+        if is_command_available("ufw"):
+            try:
+                res = subprocess.run("ufw status", shell=True, capture_output=True, text=True)
+                if "active" in res.stdout.lower():
+                    os.system(f"ufw allow {port}/tcp >/dev/null 2>&1")
+            except Exception:
+                pass
+        if is_command_available("iptables"):
+            os.system(f"iptables -C INPUT -p tcp --dport {port} -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport {port} -j ACCEPT 2>/dev/null || true")
+
+
 def ensure_docker_and_compose() -> tuple[bool, str]:
     """
     Ensures Docker and Docker Compose are installed and running.
@@ -512,6 +526,7 @@ def perform_code_update(state: dict, existing: dict) -> None:
             print(f"{RED}❌ Docker is not ready. Aborting container restart.{RESET}")
             return
 
+        ensure_firewall_port(8080)
         print("⏳ Stopping previous container...")
         os.system(f"{compose_cmd} down >/dev/null 2>&1")
 
@@ -882,6 +897,7 @@ DEBUG=false
         docker_ready, compose_cmd = ensure_docker_and_compose()
         if docker_ready and compose_cmd:
             os.makedirs("data", exist_ok=True)
+            ensure_firewall_port(8080)
             if sys.platform.startswith("linux"):
                 os.system("chmod -R 777 data >/dev/null 2>&1")
             print(f"\n{CYAN}Starting containers with {BOLD}{compose_cmd} up -d --build{RESET}...{RESET}")

@@ -83,6 +83,17 @@ pip install -r requirements.txt
 mkdir -p data
 chmod -R 777 data
 
+# Ensure WebUI port 8080 is accessible through Linux firewall
+if command -v ufw >/dev/null 2>&1; then
+    if ufw status 2>/dev/null | grep -qw "active"; then
+        echo -e "${CYAN}🔓 Allowing WebUI port 8080 in UFW firewall...${NC}"
+        ufw allow 8080/tcp >/dev/null 2>&1 || true
+    fi
+fi
+if command -v iptables >/dev/null 2>&1; then
+    iptables -C INPUT -p tcp --dport 8080 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 8080 -j ACCEPT 2>/dev/null || true
+fi
+
 # Run interactive configuration wizard
 echo -e "\n${CYAN}[4/4] Launching Interactive Setup Wizard...${NC}"
 python3 setup.py

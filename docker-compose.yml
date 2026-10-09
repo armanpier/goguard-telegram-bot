@@ -9,10 +9,13 @@ services:
       - .env
     volumes:
       - ./data:/app/data
+      - ./app:/app/app
     ports:
       - "8080:8080"
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/bot.db
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=8080
     logging:
       driver: "json-file"
       options:
