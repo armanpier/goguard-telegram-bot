@@ -441,6 +441,24 @@ def sanitize_and_patch_env(existing: dict) -> dict:
         admin_ids = "[" + ", ".join(parts) + "]"
         existing["ADMIN_IDS"] = admin_ids
 
+    # Sanitize SUPPORT_USERNAME
+    raw_sup = existing.get("SUPPORT_USERNAME", "@vpn_support")
+    if raw_sup:
+        clean_sup = re.sub(r"^(?:https?://)?(?:www\.)?t\.me/", "", str(raw_sup).strip()).strip().strip("/").strip("@").strip("/")
+        existing["SUPPORT_USERNAME"] = f"@{clean_sup}" if clean_sup else "@vpn_support"
+    else:
+        existing["SUPPORT_USERNAME"] = "@vpn_support"
+
+    # Sanitize REQUIRED_CHANNEL_ID
+    raw_chan = existing.get("REQUIRED_CHANNEL_ID", "")
+    if raw_chan:
+        s_chan = str(raw_chan).strip()
+        if not (s_chan.startswith("-100") or (s_chan.startswith("-") and s_chan[1:].isdigit()) or s_chan.isdigit()):
+            clean_chan = re.sub(r"^(?:https?://)?(?:www\.)?t\.me/", "", s_chan).strip().strip("/").strip("@").strip("/")
+            existing["REQUIRED_CHANNEL_ID"] = f"@{clean_chan}" if clean_chan else ""
+        else:
+            existing["REQUIRED_CHANNEL_ID"] = s_chan
+
     # Set DATABASE_URL to container path
     if existing.get("DATABASE_URL") in ("sqlite+aiosqlite:///bot.db", "sqlite+aiosqlite://bot.db"):
         existing["DATABASE_URL"] = "sqlite+aiosqlite:////app/data/bot.db"
@@ -679,20 +697,31 @@ def main():
         break
 
     # Support Username
-    support_username = prompt_input(
+    raw_support = prompt_input(
         "Enter Support Telegram Username",
         default=existing.get("SUPPORT_USERNAME", "@vpn_support"),
         required=False,
     )
-    if not support_username.startswith("@") and support_username:
-        support_username = f"@{support_username}"
+    clean_sup = re.sub(r"^(?:https?://)?(?:www\.)?t\.me/", "", raw_support.strip()).strip().strip("/").strip("@").strip("/")
+    support_username = f"@{clean_sup}" if clean_sup else "@vpn_support"
+    print(f"{GREEN}✓ Configured Support Username: {support_username}{RESET}")
 
     # Required Channel (Optional)
-    required_channel = prompt_input(
+    raw_channel = prompt_input(
         "Enter Required Channel ID/Username for mandatory membership (optional, leave blank to disable)",
         default=existing.get("REQUIRED_CHANNEL_ID", ""),
         required=False,
-    )
+    ).strip()
+    if raw_channel:
+        if raw_channel.startswith("-100") or (raw_channel.startswith("-") and raw_channel[1:].isdigit()) or raw_channel.isdigit():
+            required_channel = raw_channel
+        else:
+            clean_chan = re.sub(r"^(?:https?://)?(?:www\.)?t\.me/", "", raw_channel).strip().strip("/").strip("@").strip("/")
+            required_channel = f"@{clean_chan}" if clean_chan else ""
+    else:
+        required_channel = ""
+    if required_channel:
+        print(f"{GREEN}✓ Configured Channel: {required_channel}{RESET}")
 
     # =========================================================================
     # Step 2: GoGuard Panel API 1.0 Credentials

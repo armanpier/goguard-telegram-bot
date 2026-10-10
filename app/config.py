@@ -108,5 +108,31 @@ class Settings(BaseSettings):
     def clean_base_url(cls, v: str) -> str:
         return v.rstrip("/")
 
+    @field_validator("SUPPORT_USERNAME", mode="before")
+    @classmethod
+    def clean_support_username(cls, v: Any) -> str:
+        if not v:
+            return "@vpn_support"
+        s = str(v).strip()
+        import re
+        s = re.sub(r"^(?:https?://)?(?:www\.)?t\.me/", "", s).strip()
+        s = s.strip("/").strip("@").strip("/")
+        return f"@{s}" if s else "@vpn_support"
+
+    @field_validator("REQUIRED_CHANNEL_ID", mode="before")
+    @classmethod
+    def clean_required_channel_id(cls, v: Any) -> Optional[str]:
+        if not v:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        import re
+        if s.startswith("-100") or (s.startswith("-") and s[1:].isdigit()) or s.isdigit():
+            return s
+        s = re.sub(r"^(?:https?://)?(?:www\.)?t\.me/", "", s).strip()
+        s = s.strip("/").strip("@").strip("/")
+        return f"@{s}" if s else None
+
 
 settings = Settings()

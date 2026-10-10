@@ -13,10 +13,16 @@ def get_welcome_text(user_name: str, user_id: int, balance: int) -> str:
 
 
 def get_force_join_text(channel_id: str) -> str:
+    if channel_id.startswith("@"):
+        clean_channel = channel_id.lstrip("@")
+        escaped_channel = channel_id.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`")
+        channel_display = f"[{escaped_channel}](https://t.me/{clean_channel})"
+    else:
+        channel_display = f"`{channel_id}`"
     return (
         "⚠️ **عضویت اجباری در کانال**\n\n"
-        f"جهت استفاده از خدمات ربات، ابتدا باید در کانال اطلاع‌رسانی ما عضو شوید:\n"
-        f"👉 {channel_id}\n\n"
+        "جهت استفاده از خدمات ربات، ابتدا باید در کانال اطلاع‌رسانی ما عضو شوید:\n"
+        f"👉 {channel_display}\n\n"
         "پس از عضویت، روی دکمه «عضو شدم ✅» کلیک کنید."
     )
 
@@ -167,9 +173,12 @@ def get_referral_text(user_id: int, invited_count: int, total_earned: int, bot_u
 
 
 def get_support_text() -> str:
+    clean_username = settings.SUPPORT_USERNAME.lstrip("@")
+    escaped_username = settings.SUPPORT_USERNAME.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`")
     return (
         "📞 **ارتباط با واحد پشتیبانی**\n\n"
         "در صورت داشتن هرگونه سوال، مشکل در اتصال یا پیگیری پرداخت، می‌توانید با آیدی پشتیبانی در ارتباط باشید:\n\n"
-        f"👨‍💻 پشتیبانی تلگرام: {settings.SUPPORT_USERNAME}\n\n"
+        f"👨‍💻 پشتیبانی تلگرام: [{escaped_username}](https://t.me/{clean_username})\n"
+        f"📋 شناسه جهت کپی: `{settings.SUPPORT_USERNAME}`\n\n"
         "ساعات پاسخگویی: ۹ صبح الی ۲۴ شب"
     )

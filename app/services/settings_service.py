@@ -227,6 +227,18 @@ async def update_settings(session: AsyncSession, new_values: Dict[str, Any]) -> 
             continue
 
         str_val = str(val).strip()
+        if key == "SUPPORT_USERNAME":
+            import re
+            clean_s = re.sub(r"^(?:https?://)?(?:www\.)?t\.me/", "", str_val).strip()
+            clean_s = clean_s.strip("/").strip("@").strip("/")
+            str_val = f"@{clean_s}" if clean_s else "@vpn_support"
+        elif key == "REQUIRED_CHANNEL_ID":
+            import re
+            if str_val:
+                if not (str_val.startswith("-100") or (str_val.startswith("-") and str_val[1:].isdigit()) or str_val.isdigit()):
+                    clean_c = re.sub(r"^(?:https?://)?(?:www\.)?t\.me/", "", str_val).strip()
+                    clean_c = clean_c.strip("/").strip("@").strip("/")
+                    str_val = f"@{clean_c}" if clean_c else ""
 
         # Update in database
         stmt = select(Setting).where(Setting.key == key)

@@ -225,7 +225,7 @@ async def process_receipt_rejection(
                 f"❌ **رسید پرداخت شما تایید نشد.**\n\n"
                 f"شناسه رسید: #{receipt.id}\n"
                 f"علت رد: **{reason}**\n\n"
-                f"در صورت نیاز به راهنمایی، با پشتیبانی ربات ({settings.SUPPORT_USERNAME}) تماس بگیرید."
+                f"در صورت نیاز به راهنمایی، با پشتیبانی ربات (`{settings.SUPPORT_USERNAME}`) تماس بگیرید."
             )
         )
     except Exception as exc:

@@ -520,7 +520,7 @@ async def callback_admin_settings(callback: CallbackQuery, is_admin: bool):
         "⚙️ **تنظیمات فعلی ربات:**\n\n"
         f"💳 شماره کارت: `{settings.CARD_NUMBER}`\n"
         f"👤 به نام: **{settings.CARD_HOLDER}**\n"
-        f"👨‍💻 آیدی پشتیبانی: {settings.SUPPORT_USERNAME}\n"
+        f"👨‍💻 آیدی پشتیبانی: `{settings.SUPPORT_USERNAME}`\n"
         f"📢 کانال عضویت اجباری: `{settings.REQUIRED_CHANNEL_ID or 'غیرفعال'}`\n"
         f"🎁 تست رایگان: `{'فعال' if settings.FREE_TRIAL_ENABLED else 'غیرفعال'}` ({settings.FREE_TRIAL_TRAFFIC_GB} GB / {settings.FREE_TRIAL_DURATION_DAYS} روز)\n"
         f"🤝 پورسانت رفرال: `{settings.REFERRAL_COMMISSION_PERCENT}٪`\n\n"

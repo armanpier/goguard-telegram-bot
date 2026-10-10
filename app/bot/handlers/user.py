@@ -527,5 +527,10 @@ async def show_tutorials(message: Message):
 
 @router.message(F.text == "📞 پشتیبانی")
 async def show_support(message: Message):
-    """Display support username and details."""
-    await message.answer(get_support_text())
+    """Display support username and details with direct link button."""
+    clean_username = settings.SUPPORT_USERNAME.lstrip("@")
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💬 ارسال پیام به پشتیبانی", url=f"https://t.me/{clean_username}")]
+    ])
+    await message.answer(get_support_text(), reply_markup=kb, disable_web_page_preview=True)

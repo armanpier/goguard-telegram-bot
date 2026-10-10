@@ -122,3 +122,37 @@ def test_subscription_delivered_keyboard_clean_url():
     kb2 = get_subscription_actions_keyboard(1, raw_url)
     assert kb2.inline_keyboard[0][0].url == expected_clean
 
+
+def test_support_username_sanitization():
+    """Verify SUPPORT_USERNAME cleans URLs, trailing/leading @ and preserves underscores."""
+    from app.config import Settings
+    cases = [
+        ("Sib_Support_P@", "@Sib_Support_P"),
+        ("@Sib_Support_P", "@Sib_Support_P"),
+        ("Sib_Support_P", "@Sib_Support_P"),
+        ("https://t.me/Sib_Support_P", "@Sib_Support_P"),
+        ("t.me/Sib_Support_P/", "@Sib_Support_P"),
+        ("", "@vpn_support"),
+    ]
+    for inp, expected in cases:
+        s = Settings(BOT_TOKEN="tok", GOGUARD_USERNAME="u", GOGUARD_PASSWORD="p", SUPPORT_USERNAME=inp)
+        assert s.SUPPORT_USERNAME == expected
+
+
+def test_support_text_preserves_underscores():
+    """Verify get_support_text safely escapes underscores for Telegram markdown and provides link."""
+    from app.config import settings
+    from app.bot.utils.texts import get_support_text
+
+    original = settings.SUPPORT_USERNAME
+    try:
+        settings.SUPPORT_USERNAME = "@Sib_Support_P"
+        text = get_support_text()
+        # Escaped link text
+        assert "[@Sib\\_Support\\_P](https://t.me/Sib_Support_P)" in text
+        # Monospace code block for 1-tap copy
+        assert "`@Sib_Support_P`" in text
+    finally:
+        settings.SUPPORT_USERNAME = original
+
+
