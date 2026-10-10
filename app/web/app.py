@@ -547,7 +547,7 @@ def create_web_app(bot: Bot, goguard: GoGuardClient) -> FastAPI:
 
     @app.post("/admins/add")
     async def add_admin_route(
-        admin_id: int = Form(...),
+        admin_id: str = Form(...),
         user: str = Depends(require_auth),
     ):
         async with async_session_factory() as session:

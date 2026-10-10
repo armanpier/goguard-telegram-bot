@@ -139,8 +139,8 @@ async def test_webui_admins_endpoints():
         assert "333333" in resp.text
         assert "444444" in resp.text
 
-        # 2. POST /admins/add
-        add_resp = await client.post("/admins/add", data={"admin_id": 555555}, follow_redirects=True)
+        # 2. POST /admins/add with numeric ID
+        add_resp = await client.post("/admins/add", data={"admin_id": "555555"}, follow_redirects=True)
         assert add_resp.status_code == 200
         assert "555555" in add_resp.text
 
@@ -151,3 +151,31 @@ async def test_webui_admins_endpoints():
         # Ensure 555555 is not in the active admins list table
         table_body = del_resp.text.split("<tbody")[1].split("</tbody>")[0]
         assert "555555" not in table_body
+
+
+@pytest.mark.asyncio
+async def test_add_admin_by_username_and_is_user_admin():
+    from app.services.settings_service import is_user_admin
+
+    async with async_session_factory() as session:
+        # Create a user with username
+        user = User(id=666777, username="Sib_Support_P", full_name="پشتیبان سیب")
+        session.add(user)
+        await session.commit()
+
+        # 1. Add admin using @Sib_Support_P
+        success, msg = await add_admin_id(session, "@Sib_Support_P")
+        assert success is True
+        assert "666777" in msg
+        assert 666777 in settings.ADMIN_IDS
+
+        # 2. Verify is_user_admin works for int and str
+        assert await is_user_admin(session, 666777) is True
+        assert await is_user_admin(session, "666777") is True
+        assert await is_user_admin(session, 999999) is False
+
+        # 3. Try to add non-existent username
+        fail_success, fail_msg = await add_admin_id(session, "@non_existent_user")
+        assert fail_success is False
+        assert "یافت نشد" in fail_msg
+

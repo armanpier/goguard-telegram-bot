@@ -574,9 +574,9 @@ async def callback_admin_add_admin(
     await state.set_state(AdminManageAdminState.waiting_for_admin_id)
     text = (
         "➕ **افزودن ادمین جدید تلگرام**\n\n"
-        "لطفاً **شناسه عددی (Telegram User ID)** کاربر مورد نظر را به صورت عدد انگلیسی ارسال نمایید،\n"
+        "لطفاً **شناسه عددی (Telegram User ID)** یا **نام کاربری (@username)** کاربر مورد نظر را ارسال نمایید،\n"
         "یا یکی از پیام‌های آن کاربر را به این چت فوروارد (Forward) کنید.\n\n"
-        "💡 *برای یافتن شناسه عددی، کاربر می‌تواند ربات @userinfobot را استارت نماید.*"
+        "💡 *در صورت ارسال نام کاربری، کاربر باید قبلاً حداقل یک‌بار ربات را استارت کرده باشد.*"
     )
     kb = get_cancel_admin_action_keyboard()
     await callback.message.edit_text(text, reply_markup=kb)
@@ -590,29 +590,27 @@ async def process_admin_add_id(
     session: AsyncSession,
     is_admin: bool,
 ):
-    """Process incoming numeric ID or forwarded message for new admin."""
+    """Process incoming numeric ID, @username, or forwarded message for new admin."""
     if not is_admin:
         await message.answer("⛔️ شما به این بخش دسترسی ندارید.")
         await state.clear()
         return
 
-    target_id: Optional[int] = None
+    target_identifier: Any = None
     if message.forward_from:
-        target_id = message.forward_from.id
+        target_identifier = message.forward_from.id
     elif message.text:
-        cleaned = message.text.strip().replace(" ", "")
-        if cleaned.isdigit():
-            target_id = int(cleaned)
+        target_identifier = message.text.strip()
 
-    if not target_id or target_id <= 0:
+    if not target_identifier:
         await message.answer(
-            "⚠️ شناسه عددی تلگرام نامعتبر است!\n\n"
-            "لطفاً شناسه عددی کاربر (مانند `123456789`) را به لاتین ارسال کرده یا پیامی از ایشان را فوروارد نمایید.",
+            "⚠️ ورودی نامعتبر است!\n\n"
+            "لطفاً شناسه عددی کاربر (مانند `123456789`) یا نام کاربری (مانند `@username`) را ارسال کرده یا پیامی از ایشان را فوروارد نمایید.",
             reply_markup=get_cancel_admin_action_keyboard(),
         )
         return
 
-    success, msg = await add_admin_id(session, target_id)
+    success, msg = await add_admin_id(session, target_identifier)
     await state.clear()
 
     admins = await get_admin_details(session)
@@ -620,8 +618,7 @@ async def process_admin_add_id(
 
     if success:
         await message.answer(
-            f"✅ **عملیات با موفقیت انجام شد!**\n\n"
-            f"کاربر با شناسه `{target_id}` به عنوان ادمین ربات افزوده شد.",
+            f"✅ **عملیات با موفقیت انجام شد!**\n\n{msg}",
             reply_markup=kb,
         )
     else:

@@ -8,6 +8,7 @@ from app.database.models import User
 from app.config import settings
 from app.bot.keyboards.inline import get_force_join_keyboard
 from app.bot.utils.texts import get_force_join_text
+from app.services.settings_service import is_user_admin
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ class AuthAndUserMiddleware(BaseMiddleware):
             return
 
         data["db_user"] = user
-        data["is_admin"] = tg_user.id in settings.ADMIN_IDS
+        data["is_admin"] = await is_user_admin(session, tg_user.id)
 
         # Optional force channel check for normal messages
         if settings.REQUIRED_CHANNEL_ID and not data["is_admin"]:

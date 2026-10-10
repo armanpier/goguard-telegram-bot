@@ -178,7 +178,7 @@ def get_support_text() -> str:
     return (
         "📞 **ارتباط با واحد پشتیبانی**\n\n"
         "در صورت داشتن هرگونه سوال، مشکل در اتصال یا پیگیری پرداخت، می‌توانید با آیدی پشتیبانی در ارتباط باشید:\n\n"
-        f"👨‍💻 پشتیبانی تلگرام: [{escaped_username}](https://t.me/{clean_username})\n"
-        f"📋 شناسه جهت کپی: `{settings.SUPPORT_USERNAME}`\n\n"
+        f"👨‍💻 پشتیبانی تلگرام: `{settings.SUPPORT_USERNAME}`\n"
+        f"🔗 لینک مستقیم: [{escaped_username}](https://t.me/{clean_username})\n\n"
         "ساعات پاسخگویی: ۹ صبح الی ۲۴ شب"
     )
